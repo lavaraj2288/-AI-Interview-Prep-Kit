@@ -3,14 +3,11 @@
  */
 
 function getApiBaseUrl(): string {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (envUrl && !envUrl.includes('localhost')) {
-    return envUrl;
+  // In the browser, use relative '/api' which Next.js proxies to the live backend
+  if (typeof window !== 'undefined') {
+    return '/api';
   }
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return 'https://ai-interview-prep-kit-wktx.onrender.com/api';
-  }
-  return envUrl || 'http://localhost:5000/api';
+  return process.env.NEXT_PUBLIC_API_URL || 'https://ai-interview-prep-kit-wktx.onrender.com/api';
 }
 
 function getAuthToken(): string | null {
