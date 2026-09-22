@@ -34,6 +34,7 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Evaluation outputs
+# Evaluation outputs & local storage
 test_kits.json
 kits.json
+.kits_storage.json
