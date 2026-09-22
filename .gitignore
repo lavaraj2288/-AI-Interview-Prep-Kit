@@ -1,0 +1,8 @@
+node_modules/
+.next/
+dist/
+.env
+*.log
+scratch/
+test_output/
+coverage/
