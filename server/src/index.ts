@@ -35,6 +35,18 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    name: 'The AI Interview Prep Kit Backend API',
+    status: 'operational',
+    health: '/health',
+    api_endpoints: '/api',
+    assessment: 'FS-AI-INTERVIEW-01',
+    message: 'Backend is running live and ready for API requests!'
+  });
+});
+
 // Health Check
 app.get('/health', (req, res) => {
   res.json({
