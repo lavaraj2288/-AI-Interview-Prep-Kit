@@ -61,7 +61,7 @@ npx tsx scripts/evaluate.ts --input <cases.json> --output <kits.json>
 ```bash
 npm test
 ```
-Runs 15 automated test suites verifying:
+Runs 18 automated tests across 5 test suites verifying:
 - Deterministic arithmetic schedule allocation (exact day matching, must-have inclusion, difficulty front-loading, integer minutes).
 - Deterministic coverage checker (gap identification, pass count tracking).
 - Strict Appendix A structure validator (rejects float minutes, out-of-bounds difficulty, or unscheduled must-haves).

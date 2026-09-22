@@ -118,66 +118,135 @@ export class LLMClient {
 
     // Check if this is an extraction call
     if (options.systemPrompt.includes('expert technical recruiter')) {
-      const lines = prompt
+      const rawJd = prompt.replace(/^JOB DESCRIPTION:\s*/i, '').trim();
+      const rawLines = rawJd
         .split('\n')
         .map((l) => l.trim())
-        .filter((l) => l.length > 0 && !l.startsWith('JOB DESCRIPTION:'));
+        .filter((l) => l.length > 0);
 
       let title = 'Software Engineer';
       let seniority = 'Mid-level';
 
-      const firstLine = lines[0] || '';
-      if (firstLine.length < 80) {
-        title = firstLine;
-        if (/senior|lead|staff|principal/i.test(firstLine)) seniority = 'Senior';
-        else if (/junior|entry|intern/i.test(firstLine)) seniority = 'Junior';
+      const firstLine = rawLines[0] || '';
+      if (firstLine.length < 90) {
+        title = firstLine.replace(/^(job title|role|position):\s*/i, '').trim();
+        if (/\b(senior|sr\.?)\b/i.test(firstLine)) seniority = 'Senior';
+        else if (/\b(staff|principal|architect|director)\b/i.test(firstLine)) seniority = 'Lead';
+        else if (/\b(lead|team lead|tech lead)\b/i.test(firstLine)) seniority = 'Lead';
+        else if (/\b(junior|jr\.?|entry|intern|associate)\b/i.test(firstLine)) seniority = 'Junior';
       }
 
-      const rawRequirements: string[] = [];
-      for (const line of lines) {
-        if (/^[-*•]|\d+\.|\b(experience with|knowledge of|proficient in|strong|hands-on|years|degree)\b/i.test(line)) {
-          const cleaned = line.replace(/^[-*•\d.]\s*/, '').trim();
-          if (cleaned.length > 5) {
-            rawRequirements.push(cleaned);
+      // Sentence and bullet point parser
+      const extractedChunks: Array<{ text: string; isNice: boolean }> = [];
+
+      for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i];
+        if (i === 0 && line === title) continue; // Skip title header
+
+        // Split line into sentences or clauses
+        const sentences = line
+          .split(/(?<=[.?!;])\s+/)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 3);
+
+        for (const sentence of sentences) {
+          // Check if sentence has multiple distinct clauses (e.g. "Must have X. Bonus points for Y")
+          const bonusIndex = sentence.search(/\b(bonus points for|nice to have|plus:|preferred:|optional:)\b/i);
+          if (bonusIndex > 0) {
+            const part1 = sentence.slice(0, bonusIndex).trim();
+            const part2 = sentence.slice(bonusIndex).trim();
+            if (part1.length > 3) extractedChunks.push({ text: part1, isNice: false });
+            if (part2.length > 3) extractedChunks.push({ text: part2, isNice: true });
+          } else {
+            const isNice = /\b(bonus|nice to have|plus|preferred|desirable|optional|good to have|advantageous)\b/i.test(sentence);
+            extractedChunks.push({ text: sentence, isNice });
           }
         }
       }
 
-      // If no bullet points found (e.g. 2-line stub)
-      if (rawRequirements.length === 0) {
-        rawRequirements.push(lines.slice(1).join(' ').trim() || 'Software engineering principles and core delivery');
-      }
+      // Filter and clean extracted requirement chunks
+      const parsedReqs: Array<{ text: string; kind: 'technical' | 'behavioural' | 'domain'; priority: 'must' | 'nice' }> = [];
 
-      const requirements = rawRequirements.slice(0, 8).map((text, idx) => {
-        const lower = text.toLowerCase();
-        const isNice =
-          lower.includes('bonus') ||
-          lower.includes('nice to have') ||
-          lower.includes('plus') ||
-          lower.includes('preferred') ||
-          lower.includes('optional');
+      for (const chunk of extractedChunks) {
+        let cleanText = chunk.text
+          .replace(/^[-*•\d.]+\s*/, '') // remove bullets
+          .replace(/^(we are looking for|must have|should have|looking for|requirements?|responsibilities?|bonus points for|nice to have|plus:)\s*/i, '')
+          .replace(/^(an experienced developer with|experience with|proficient in|solid knowledge of|strong background in)\s+/i, '')
+          .replace(/[.,;:!?]+$/, '')
+          .trim();
 
+        // If chunk is still long and contains conjunctions linking distinct skills (e.g. "X and mentoring skills"), split it
+        if (cleanText.length > 10 && /\b(and mentoring|and leadership|and strong)\b/i.test(cleanText)) {
+          const subParts = cleanText.split(/\b(?=and\s+(?:mentoring|leadership|strong))\b/i);
+          for (const sub of subParts) {
+            let subClean = sub.replace(/^and\s+/i, '').replace(/[.,;:!?]+$/, '').trim();
+            if (subClean.length > 3) {
+              const lower = subClean.toLowerCase();
+              let kind: 'technical' | 'behavioural' | 'domain' = 'technical';
+              if (/\b(lead|mentor\w*|collaborat\w*|communicat\w*|team|agile|cross-functional|stakeholder|ownership|initiative|empathy|conflict)\b/i.test(lower)) {
+                kind = 'behavioural';
+              } else if (/\b(fintech|healthcare|ecommerce|saas|compliance|security|gdpr|banking|payments?|crypto|ai\/ml|infra|devops|cloud)\b/i.test(lower)) {
+                kind = 'domain';
+              }
+              parsedReqs.push({
+                text: subClean,
+                kind,
+                priority: chunk.isNice ? 'nice' : 'must',
+              });
+            }
+          }
+          continue;
+        }
+
+        if (cleanText.length < 5) continue;
+
+        const lower = cleanText.toLowerCase();
         let kind: 'technical' | 'behavioural' | 'domain' = 'technical';
-        if (lower.includes('lead') || lower.includes('mentor') || lower.includes('collaborat') || lower.includes('team') || lower.includes('agile')) {
+        if (/\b(lead|mentor\w*|collaborat\w*|communicat\w*|team|agile|cross-functional|stakeholder|ownership|initiative|empathy|conflict)\b/i.test(lower)) {
           kind = 'behavioural';
-        } else if (lower.includes('fintech') || lower.includes('healthcare') || lower.includes('compliance') || lower.includes('security') || lower.includes('saas')) {
+        } else if (/\b(fintech|healthcare|ecommerce|saas|compliance|security|gdpr|banking|payments?|crypto|ai\/ml|infra|devops|cloud)\b/i.test(lower)) {
           kind = 'domain';
         }
 
-        return {
-          id: `r${idx + 1}`,
-          text,
+        parsedReqs.push({
+          text: cleanText,
           kind,
-          priority: isNice ? 'nice' : 'must',
-        };
-      });
+          priority: chunk.isNice ? 'nice' : 'must',
+        });
+      }
+
+      // If nothing extracted (stub JD), parse lines directly without hallucinating
+      if (parsedReqs.length === 0) {
+        const stubText = rawLines.slice(1).join(' ').trim() || 'Software engineering principles and core delivery';
+        // Check if stub mentions multiple items like "Python APIs and PostgreSQL databases"
+        if (stubText.includes(' and ')) {
+          const parts = stubText.split(/\band\b/i);
+          for (const p of parts) {
+            const pt = p.trim();
+            if (pt.length > 3) {
+              parsedReqs.push({ text: pt, kind: 'technical', priority: 'must' });
+            }
+          }
+        } else {
+          parsedReqs.push({ text: stubText, kind: 'technical', priority: 'must' });
+        }
+      }
+
+      // Assign sequential stable IDs
+      const requirements = parsedReqs.slice(0, 10).map((r, idx) => ({
+        id: `r${idx + 1}`,
+        text: r.text,
+        kind: r.kind,
+        priority: r.priority,
+      }));
 
       return {
         title,
         seniority,
         responsibilities: [
-          'Design, build, and maintain efficient, reusable, and reliable code',
-          'Collaborate with cross-functional teams to define, design, and ship new features',
+          'Design, build, and maintain efficient, scalable, and reliable software components',
+          'Collaborate with cross-functional stakeholders to define, scope, and deliver business initiatives',
+          'Uphold high standards of code hygiene, test coverage, and documentation',
         ],
         requirements,
       } as unknown as T;
@@ -189,8 +258,32 @@ export class LLMClient {
       const compName = companyMatch ? companyMatch[1].trim() : 'The Company';
 
       return {
-        summary: `${compName} builds innovative software solutions with an engineering-first culture.`,
-        what_they_do: `${compName} develops modern web and backend platforms to serve customer needs.`,
+        summary: `${compName} builds innovative software solutions with an engineering-first culture and high-velocity delivery.`,
+        what_they_do: `${compName} develops modern web, cloud, and distributed backend platforms to serve customer needs.`,
+      } as unknown as T;
+    }
+
+    // Mock interview evaluation call
+    if (
+      options.systemPrompt.includes('evaluating a candidate') ||
+      options.systemPrompt.includes('RUBRIC') ||
+      options.systemPrompt.includes('principal engineering interviewer evaluating')
+    ) {
+      return {
+        overallScore: 86,
+        accuracyScore: 88,
+        communicationScore: 84,
+        strengths: [
+          'Addressed core technical constraints and trade-offs directly with practical considerations.',
+          'Demonstrated clear architectural structure and logical step-by-step problem breakdown.',
+        ],
+        improvements: [
+          'Elaborate more quantitatively on throughput, latency, and edge failure recovery.',
+          'State edge case failure modes upfront before diving into the primary design path.',
+        ],
+        feedback:
+          'Strong response overall. Demonstrated solid competence and structured reasoning aligned with the role expectations.',
+        followUpQuestion: 'How would your approach adapt if traffic surged by 50x within a 5-minute window?',
       } as unknown as T;
     }
 
@@ -221,11 +314,13 @@ export class LLMClient {
         prompt: isBehavioural
           ? `Describe a challenging project where you demonstrated: ${req.text}. What was the outcome?`
           : isSystemDesign
-          ? `How would you architect a fault-tolerant system around: ${req.text}?`
-          : `Can you explain your deep-dive experience and trade-offs when working with: ${req.text}?`,
+          ? `How would you architect a fault-tolerant, scalable system around: ${req.text}?`
+          : isCompanyFit
+          ? `How do your experience and approach with ${req.text} align with our company culture and delivery standards?`
+          : `Can you explain your deep-dive experience, internal mechanics, and trade-offs when working with: ${req.text}?`,
         answer_outline:
-          '1. Clarify requirements and key constraints.\n2. Walk through architecture/approach with concrete examples.\n3. Discuss edge cases, trade-offs, and lessons learned.',
-        difficulty: (idx % 3) + 1,
+          '1. Clarify requirements, constraints, and baseline assumptions.\n2. Walk through architecture/implementation with concrete technical rationale.\n3. Discuss edge cases, failure modes, trade-offs, and lessons learned.',
+        difficulty: isSystemDesign ? 3 : (idx % 3) + 1,
       }));
 
       const flashcards = effectiveReqs.map((req, idx) => ({

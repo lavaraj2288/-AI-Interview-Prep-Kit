@@ -34,6 +34,9 @@ export default function PracticePage() {
     }
   };
 
+  const currentCard = sessionData?.orderedCards?.[currentIndex] || null;
+  const isLastCard = sessionData?.orderedCards ? currentIndex === sessionData.orderedCards.length - 1 : true;
+
   const handleRateConfidence = async (confidence: number) => {
     if (!sessionData || !currentCard) return;
     setRecording(true);
@@ -72,6 +75,43 @@ export default function PracticePage() {
     }
   };
 
+  // Keyboard navigation for accessibility and rapid practice
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Avoid firing if user is inside an input or textarea
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+
+      if (e.code === 'Space' || e.key === 'Enter') {
+        e.preventDefault();
+        setIsFlipped((prev) => !prev);
+      } else if (e.key === 'ArrowRight' || e.key === 'j') {
+        e.preventDefault();
+        if (sessionData && currentIndex < sessionData.orderedCards.length - 1) {
+          setCurrentIndex((prev) => prev + 1);
+          setIsFlipped(false);
+        }
+      } else if (e.key === 'ArrowLeft' || e.key === 'k') {
+        e.preventDefault();
+        if (currentIndex > 0) {
+          setCurrentIndex((prev) => prev - 1);
+          setIsFlipped(false);
+        }
+      } else if (e.key === '1') {
+        e.preventDefault();
+        handleRateConfidence(1);
+      } else if (e.key === '2') {
+        e.preventDefault();
+        handleRateConfidence(2);
+      } else if (e.key === '3') {
+        e.preventDefault();
+        handleRateConfidence(3);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [sessionData, currentIndex, currentCard]);
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center p-12 text-slate-500 text-sm">
@@ -91,9 +131,6 @@ export default function PracticePage() {
       </div>
     );
   }
-
-  const currentCard = sessionData.orderedCards[currentIndex];
-  const isLastCard = currentIndex === sessionData.orderedCards.length - 1;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full flex-1 flex flex-col justify-between">
@@ -269,6 +306,15 @@ export default function PracticePage() {
           >
             Next Card →
           </button>
+        </div>
+
+        {/* Keyboard accessibility helper */}
+        <div className="hidden sm:flex justify-center items-center gap-3 mt-3 pt-2 text-[10px] text-slate-400 font-mono">
+          <span><kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600">Space</kbd> Flip</span>
+          <span>•</span>
+          <span><kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600">1</kbd> <kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600">2</kbd> <kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600">3</kbd> Rate</span>
+          <span>•</span>
+          <span><kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600">←</kbd> <kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600">→</kbd> Move</span>
         </div>
       </div>
     </div>

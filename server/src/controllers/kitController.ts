@@ -245,14 +245,35 @@ export async function regenerateSection(
 ): Promise<void> {
   try {
     const { section, category } = req.body; // e.g. section: 'question-category' | 'company_brief' | 'schedule'
-    const kitDoc = await Kit.findOne({ _id: req.params.id, userId: req.userId });
+    const kitId = String(req.params.id);
 
-    if (!kitDoc) {
-      res.status(404).json({ error: 'Kit not found.' });
-      return;
+    let kit: PrepKit;
+    let saveKit: (updatedKit: PrepKit) => Promise<void>;
+
+    if (!FallbackStore.isMongoConnected() || kitId.startsWith('mem_')) {
+      const memDoc = FallbackStore.kits.get(kitId);
+      if (!memDoc || (req.userId && memDoc.userId !== req.userId)) {
+        res.status(404).json({ error: 'Kit not found.' });
+        return;
+      }
+      kit = memDoc.kit;
+      saveKit = async (updatedKit: PrepKit) => {
+        memDoc.kit = updatedKit;
+        memDoc.updatedAt = new Date();
+      };
+    } else {
+      const kitDoc = await Kit.findOne({ _id: kitId, userId: req.userId });
+      if (!kitDoc) {
+        res.status(404).json({ error: 'Kit not found.' });
+        return;
+      }
+      kit = kitDoc.kit;
+      saveKit = async (updatedKit: PrepKit) => {
+        kitDoc.kit = updatedKit;
+        kitDoc.markModified('kit');
+        await kitDoc.save();
+      };
     }
-
-    const kit: PrepKit = kitDoc.kit;
 
     if (section === 'company_brief') {
       const briefPrompts = buildCompanyBriefPrompt(
@@ -342,13 +363,11 @@ export async function regenerateSection(
       );
     }
 
-    kitDoc.kit = kit;
-    kitDoc.markModified('kit');
-    await kitDoc.save();
+    await saveKit(kit);
 
     res.status(200).json({
       message: `Section "${section}" regenerated successfully while preserving user edits.`,
-      kit: kitDoc.kit,
+      kit,
     });
   } catch (err) {
     console.error('Regenerate section error:', err);
@@ -379,14 +398,34 @@ export async function batchUpload(
         });
 
         if (result.success && result.kit) {
-          const doc = await Kit.create({
-            userId: req.userId,
-            title: `${result.kit.role.title} at ${result.kit.source.company}`,
-            company: result.kit.source.company,
-            kit: result.kit,
-            status: 'ready',
-          });
-          createdKits.push({ id: doc._id, title: doc.title });
+          let kitId: string;
+          const kitTitle = `${result.kit.role.title} at ${result.kit.source.company}`;
+
+          if (!FallbackStore.isMongoConnected()) {
+            const fakeId = `mem_kit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+            FallbackStore.kits.set(fakeId, {
+              _id: fakeId,
+              userId: req.userId || 'anon',
+              title: kitTitle,
+              company: result.kit.source.company,
+              kit: result.kit,
+              status: 'ready',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+            kitId = fakeId;
+          } else {
+            const doc = await Kit.create({
+              userId: req.userId,
+              title: kitTitle,
+              company: result.kit.source.company,
+              kit: result.kit,
+              status: 'ready',
+            });
+            kitId = doc._id.toString();
+          }
+
+          createdKits.push({ id: kitId, title: kitTitle });
         } else {
           errors.push({ company_url: c.company_url, error: result.error });
         }
