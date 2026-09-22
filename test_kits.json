@@ -1,0 +1,261 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-09-22T09:18:56.679Z",
+  "kits": [
+    {
+      "id": "case-01",
+      "status": "ok",
+      "kit": {
+        "source": {
+          "company": "Example Domain",
+          "company_url": "https://example.com/",
+          "role": "Senior Full Stack Engineer",
+          "location": "Remote / Hybrid",
+          "jd_chars": 222,
+          "researched_at": "2026-09-22T09:18:49.154Z",
+          "pages_used": [
+            "https://example.com/"
+          ]
+        },
+        "company_brief": {
+          "summary": "Example Domain builds innovative software solutions with an engineering-first culture.",
+          "what_they_do": "Example Domain develops modern web and backend platforms to serve customer needs.",
+          "sources": [
+            "https://example.com/"
+          ]
+        },
+        "role": {
+          "title": "Senior Full Stack Engineer",
+          "seniority": "Senior",
+          "responsibilities": [
+            "Design, build, and maintain efficient, reusable, and reliable code",
+            "Collaborate with cross-functional teams to define, design, and ship new features"
+          ],
+          "requirements": [
+            {
+              "id": "r1",
+              "text": "We are looking for an experienced developer with 5+ years with React and TypeScript. Must have strong distributed systems experience and mentoring skills. Bonus points for GraphQL and Kubernetes.",
+              "kind": "behavioural",
+              "priority": "nice"
+            }
+          ]
+        },
+        "questions": [
+          {
+            "id": "q1",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "behavioural",
+            "prompt": "Describe a challenging project where you demonstrated: We are looking for an experienced developer with 5+ years with React and TypeScript. Must have strong distributed systems experience and mentoring skills. Bonus points for GraphQL and Kubernetes.. What was the outcome?",
+            "answer_outline": "1. Clarify requirements and key constraints.\n2. Walk through architecture/approach with concrete examples.\n3. Discuss edge cases, trade-offs, and lessons learned.",
+            "difficulty": 1,
+            "origin": "generated",
+            "pinned": false
+          },
+          {
+            "id": "q2",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "system-design",
+            "prompt": "Describe a challenging project where you demonstrated: We are looking for an experienced developer with 5+ years with React and TypeScript. Must have strong distributed systems experience and mentoring skills. Bonus points for GraphQL and Kubernetes.. What was the outcome?",
+            "answer_outline": "1. Clarify requirements and key constraints.\n2. Walk through architecture/approach with concrete examples.\n3. Discuss edge cases, trade-offs, and lessons learned.",
+            "difficulty": 3,
+            "origin": "generated",
+            "pinned": false
+          }
+        ],
+        "flashcards": [
+          {
+            "id": "f1",
+            "front": "Key concepts & principles: We are looking for an experienced developer with 5+ years with React and TypeScript. Must have strong distributed systems experience and mentoring skills. Bonus points for GraphQL and Kubernetes.",
+            "back": "Core architectural best practices, syntax nuances, and common pitfall mitigations for We are looking for an experienced developer with 5+ years with React and TypeScript. Must have strong distributed systems experience and mentoring skills. Bonus points for GraphQL and Kubernetes..",
+            "requirement_ids": [
+              "r1"
+            ],
+            "origin": "generated",
+            "pinned": false
+          }
+        ],
+        "schedule": {
+          "days_available": 5,
+          "days": [
+            {
+              "day": 1,
+              "focus": "Core Must-Haves & Foundational Deep Dive",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 2,
+              "focus": "Leadership, Behavioral Scenarios & STAR Responses",
+              "question_ids": [
+                "q1"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 3,
+              "focus": "System Architecture, Scalability & Design Trade-offs",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 4,
+              "focus": "Leadership, Behavioral Scenarios & STAR Responses",
+              "question_ids": [
+                "q1"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 5,
+              "focus": "Final Polish, Company Alignment & Mock Drills",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 30
+            }
+          ]
+        },
+        "coverage": {
+          "uncovered_requirement_ids": [],
+          "passes": 1
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "case-02",
+      "status": "ok",
+      "kit": {
+        "source": {
+          "company": "Example Domain",
+          "company_url": "https://example.org/",
+          "role": "Backend Developer",
+          "location": "Remote / Hybrid",
+          "jd_chars": 61,
+          "researched_at": "2026-09-22T09:18:56.678Z",
+          "pages_used": [
+            "https://example.org/"
+          ]
+        },
+        "company_brief": {
+          "summary": "Example Domain builds innovative software solutions with an engineering-first culture.",
+          "what_they_do": "Example Domain develops modern web and backend platforms to serve customer needs.",
+          "sources": [
+            "https://example.org/"
+          ]
+        },
+        "role": {
+          "title": "Backend Developer",
+          "seniority": "Mid-level",
+          "responsibilities": [
+            "Design, build, and maintain efficient, reusable, and reliable code",
+            "Collaborate with cross-functional teams to define, design, and ship new features"
+          ],
+          "requirements": [
+            {
+              "id": "r1",
+              "text": "Build Python APIs and PostgreSQL databases.",
+              "kind": "technical",
+              "priority": "must"
+            }
+          ]
+        },
+        "questions": [
+          {
+            "id": "q1",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "technical",
+            "prompt": "Describe a challenging project where you demonstrated: Build Python APIs and PostgreSQL databases.. What was the outcome?",
+            "answer_outline": "1. Clarify requirements and key constraints.\n2. Walk through architecture/approach with concrete examples.\n3. Discuss edge cases, trade-offs, and lessons learned.",
+            "difficulty": 1,
+            "origin": "generated",
+            "pinned": false
+          },
+          {
+            "id": "q2",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "behavioural",
+            "prompt": "Describe a challenging project where you demonstrated: Build Python APIs and PostgreSQL databases.. What was the outcome?",
+            "answer_outline": "1. Clarify requirements and key constraints.\n2. Walk through architecture/approach with concrete examples.\n3. Discuss edge cases, trade-offs, and lessons learned.",
+            "difficulty": 1,
+            "origin": "generated",
+            "pinned": false
+          },
+          {
+            "id": "q3",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "company-fit",
+            "prompt": "Describe a challenging project where you demonstrated: Build Python APIs and PostgreSQL databases.. What was the outcome?",
+            "answer_outline": "1. Clarify requirements and key constraints.\n2. Walk through architecture/approach with concrete examples.\n3. Discuss edge cases, trade-offs, and lessons learned.",
+            "difficulty": 2,
+            "origin": "generated",
+            "pinned": false
+          }
+        ],
+        "flashcards": [
+          {
+            "id": "f1",
+            "front": "Key concepts & principles: Build Python APIs and PostgreSQL databases.",
+            "back": "Core architectural best practices, syntax nuances, and common pitfall mitigations for Build Python APIs and PostgreSQL databases..",
+            "requirement_ids": [
+              "r1"
+            ],
+            "origin": "generated",
+            "pinned": false
+          },
+          {
+            "id": "f2",
+            "front": "Key concepts & principles: Build Python APIs and PostgreSQL databases.",
+            "back": "Core architectural best practices, syntax nuances, and common pitfall mitigations for Build Python APIs and PostgreSQL databases..",
+            "requirement_ids": [
+              "r1"
+            ],
+            "origin": "generated",
+            "pinned": false
+          }
+        ],
+        "schedule": {
+          "days_available": 2,
+          "days": [
+            {
+              "day": 1,
+              "focus": "Core Must-Haves & Foundational Deep Dive",
+              "question_ids": [
+                "q3",
+                "q1"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 2,
+              "focus": "Final Polish, Company Alignment & Mock Drills",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 30
+            }
+          ]
+        },
+        "coverage": {
+          "uncovered_requirement_ids": [],
+          "passes": 1
+        }
+      },
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "case-01",
+    "jd": "Senior Full Stack Engineer\nWe are looking for an experienced developer with 5+ years with React and TypeScript. Must have strong distributed systems experience and mentoring skills. Bonus points for GraphQL and Kubernetes.",
+    "company_url": "https://example.com",
+    "days": 5
+  },
+  {
+    "id": "case-02",
+    "jd": "Backend Developer\nBuild Python APIs and PostgreSQL databases.",
+    "company_url": "https://example.org",
+    "days": 2
+  }
+]
