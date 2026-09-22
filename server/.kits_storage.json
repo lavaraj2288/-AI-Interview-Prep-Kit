@@ -1,0 +1,13 @@
+{
+  "users": [
+    {
+      "id": "user_1790079969598_8z5f0",
+      "email": "rajabandaru255@gmail.com",
+      "passwordHash": "$2a$10$taZmQZJzWIxgFc3hCytRq.UcMH7jBO3rN7ITToesESOTKCUfcOlX6",
+      "name": "raja",
+      "createdAt": "2026-09-22T12:26:09.598Z"
+    }
+  ],
+  "kits": [],
+  "sessions": []
+}

@@ -1,8 +1,39 @@
+# Dependencies
 node_modules/
-.next/
-dist/
-.env
-*.log
-scratch/
-test_output/
+.pnp
+.pnp.js
+
+# Testing
 coverage/
+
+# Next.js build
+client/.next/
+client/out/
+
+# Server build
+server/dist/
+dist/
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# OS / Editor
+.DS_Store
+*.pem
+Thumbs.db
+.vscode/
+.idea/
+
+# Evaluation outputs
+test_kits.json
+kits.json

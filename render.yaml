@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: interview-prep-backend
+    env: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOW_LOCAL_URLS
+        value: "false"
+      - key: CRAWLER_TIMEOUT_MS
+        value: "8000"

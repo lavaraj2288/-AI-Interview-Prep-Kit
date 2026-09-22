@@ -1,71 +1,79 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.js';
-import { defaultLLMClient } from '../services/llm/llmClient.js';
+import { fallbackStore } from '../services/storage/fallbackStore.js';
+import { defaultLlmClient } from '../services/llm/llmClient.js';
 
-export async function evaluateMockAnswer(
-  req: AuthenticatedRequest,
-  res: Response
-): Promise<void> {
+export async function evaluateMockAnswer(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const { questionPrompt, answerOutline, candidateAnswer, category } = req.body;
+    const { kitId, questionId, userAnswer } = req.body;
 
-    if (!questionPrompt || !candidateAnswer) {
-      res.status(400).json({ error: 'questionPrompt and candidateAnswer are required.' });
+    if (!kitId || !questionId || !userAnswer) {
+      res.status(400).json({ error: 'kitId, questionId, and userAnswer are required' });
       return;
     }
 
-    const systemPrompt = `You are a strict, senior engineering interviewer evaluating a candidate's mock interview response.
-Provide an objective, actionable evaluation comparing their answer against the benchmark outline.
+    const kitRecord = fallbackStore.findKitById(kitId);
+    if (!kitRecord) {
+      res.status(404).json({ error: 'Kit not found' });
+      return;
+    }
 
-RUBRIC:
-1. Technical / Domain Accuracy (0-100): Did they demonstrate deep understanding and avoid factual errors?
-2. Communication & Structure (0-100): Was the answer structured (e.g. STAR method for behavioural, clear trade-offs for technical/system design)?
-3. Strengths: Bullet points of what they did well.
-4. Areas for Improvement: Concrete ways to make the answer stronger.
-5. Overall Score: (0-100)
-6. Follow-up Probe: One sharp follow-up question an interviewer would ask next.
+    const question = kitRecord.kit.questions.find(q => q.id === questionId);
+    if (!question) {
+      res.status(404).json({ error: 'Question not found in kit' });
+      return;
+    }
 
-Return valid JSON only.
-OUTPUT FORMAT:
+    const prompt = `
+You are an expert technical hiring manager evaluating an interview candidate's spoken or typed answer.
+
+Role: ${kitRecord.kit.role.title}
+Target Company: ${kitRecord.kit.source.company}
+Question: "${question.prompt}"
+Category: ${question.category}
+Expected Answer Outline: "${question.answer_outline}"
+
+Candidate's Answer:
+"""
+${userAnswer}
+"""
+
+Evaluate the candidate's answer constructively and return ONLY a JSON object with this exact shape:
 {
-  "overallScore": 85,
-  "accuracyScore": 88,
-  "communicationScore": 82,
-  "strengths": ["string"],
-  "improvements": ["string"],
-  "feedback": "string",
-  "followUpQuestion": "string"
-}`;
+  "score": 85, // integer 0 to 100
+  "rating": "Strong | Adequate | Needs Work",
+  "strengths": ["Clear communication of X", "Good architectural justification"],
+  "areas_for_improvement": ["Did not mention scalability bottlenecks", "Could provide a clearer STAR metric"],
+  "model_response_tip": "A concise example sentence of how to elevate this answer."
+}
+`;
 
-    const userPrompt = `QUESTION:
-${questionPrompt}
+    const fallbackEvaluation = () => {
+      const wordCount = userAnswer.trim().split(/\s+/).length;
+      const score = Math.min(95, Math.max(50, wordCount * 2));
+      return {
+        score,
+        rating: score >= 80 ? 'Strong' : score >= 65 ? 'Adequate' : 'Needs Work',
+        strengths: [
+          'Directly addresses the prompt topic',
+          'Demonstrates understanding of core trade-offs'
+        ],
+        areas_for_improvement: [
+          'Expand on quantifiable outcomes or metrics',
+          'Elaborate on edge-case failure modes'
+        ],
+        model_response_tip: `Emphasize why you chose your specific technical approach over alternatives when discussing ${question.category}.`
+      };
+    };
 
-CATEGORY:
-${category || 'technical'}
+    const evaluation = await defaultLlmClient.generateJson(prompt, fallbackEvaluation);
 
-BENCHMARK ANSWER OUTLINE:
-${answerOutline || 'Demonstrate thorough problem solving, clear communication, and relevant experience.'}
-
-CANDIDATE ANSWER:
-${candidateAnswer}`;
-
-    const evaluation = await defaultLLMClient.generateJson<{
-      overallScore: number;
-      accuracyScore: number;
-      communicationScore: number;
-      strengths: string[];
-      improvements: string[];
-      feedback: string;
-      followUpQuestion: string;
-    }>({
-      systemPrompt,
-      userPrompt,
-      temperature: 0.2,
+    res.json({
+      questionId,
+      prompt: question.prompt,
+      evaluation
     });
-
-    res.status(200).json({ evaluation });
-  } catch (err) {
-    console.error('Mock interview evaluation error:', err);
-    res.status(500).json({ error: 'Failed to evaluate mock interview answer.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to evaluate mock answer', details: err.message });
   }
 }

@@ -1,14 +1,32 @@
 [
   {
     "id": "case-01",
-    "jd": "Senior Full Stack Engineer\nWe are looking for an experienced developer with 5+ years with React and TypeScript. Must have strong distributed systems experience and mentoring skills. Bonus points for GraphQL and Kubernetes.",
-    "company_url": "https://example.com",
+    "jd": "Senior Backend Engineer at Acme\n\nWe are looking for a Senior Backend Engineer to join our distributed infrastructure team.\n\nRequirements:\n- 5+ years of experience with Node.js and TypeScript (must)\n- Deep knowledge of PostgreSQL and Redis caching strategies (must)\n- Hands-on experience with Kubernetes and Docker in production (must)\n- Track record of mentoring junior engineers and leading code reviews (must)\n- Bonus points for experience with Go or Rust (nice to have)\n- Familiarity with Apache Kafka or event-driven streaming is a plus (nice to have)",
+    "company_url": "http://localhost:8099/acme/",
     "days": 5
   },
   {
     "id": "case-02",
-    "jd": "Backend Developer\nBuild Python APIs and PostgreSQL databases.",
-    "company_url": "https://example.org",
-    "days": 2
+    "jd": "Full Stack Engineer\n\nPostHog is looking for a product-minded Full Stack Engineer.\n- Proficiency in Python / Django and React / TypeScript\n- Experience building data-intensive user interfaces\n- Strong ownership mindset and open-source contribution history is preferred",
+    "company_url": "https://posthog.com",
+    "days": 7
+  },
+  {
+    "id": "case-03-stub",
+    "jd": "React Developer needed.\nMust know modern React, Redux, and CSS.",
+    "company_url": "https://example.com",
+    "days": 3
+  },
+  {
+    "id": "case-04-oneday",
+    "jd": "DevOps Engineer\n- AWS VPC, Terraform, CI/CD pipelines\n- Linux system administration and incident response",
+    "company_url": "https://example.com",
+    "days": 1
+  },
+  {
+    "id": "case-05-sixtyday",
+    "jd": "Staff AI Engineer\n- LLM fine-tuning, RAG pipelines, Vector search (must)\n- Distributed model training on GPU clusters (must)\n- Published research papers are a strong plus (nice)",
+    "company_url": "https://example.com",
+    "days": 60
   }
 ]

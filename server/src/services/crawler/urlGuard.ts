@@ -1,66 +1,60 @@
 import { URL } from 'url';
 
-const PRIVATE_IP_REGEX =
-  /^(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|0\.0\.0\.0|::1)$/i;
-
 export interface UrlValidationResult {
   valid: boolean;
-  normalizedUrl: string;
-  error?: string;
+  normalizedUrl?: string;
+  reason?: string;
 }
 
-export function validateAndNormalizeUrl(
-  urlString: string,
-  isProduction: boolean = process.env.NODE_ENV === 'production'
-): UrlValidationResult {
+const PRIVATE_IP_PATTERNS = [
+  /^127\./,                         // Loopback
+  /^10\./,                          // Private class A
+  /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // Private class B
+  /^192\.168\./,                    // Private class C
+  /^169\.254\./,                    // Link-local / Cloud metadata (AWS/GCP/Azure)
+  /^0\.0\.0\.0/,
+  /^localhost$/i,
+  /^\[?::1\]?$/,
+  /^fc00:/i,
+  /^fe80:/i,
+];
+
+export function validateExternalUrl(urlString: string, allowLocal: boolean = false): UrlValidationResult {
   if (!urlString || typeof urlString !== 'string') {
-    return { valid: false, normalizedUrl: '', error: 'URL is required' };
+    return { valid: false, reason: 'Empty or invalid URL provided' };
   }
 
-  let trimmed = urlString.trim();
-  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
-    trimmed = `https://${trimmed}`;
-  }
+  const trimmed = urlString.trim();
 
+  // Protocol check
+  let parsed: URL;
   try {
-    const parsed = new URL(trimmed);
-
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return {
-        valid: false,
-        normalizedUrl: '',
-        error: `Unsupported protocol: ${parsed.protocol}. Only http and https are allowed.`,
-      };
-    }
-
-    const hostname = parsed.hostname;
-
-    // In production mode, guard against SSRF to private/internal networks
-    if (isProduction && PRIVATE_IP_REGEX.test(hostname)) {
-      return {
-        valid: false,
-        normalizedUrl: '',
-        error: `Access to private or loopback host (${hostname}) is blocked in production.`,
-      };
-    }
-
-    return {
-      valid: true,
-      normalizedUrl: parsed.toString(),
-    };
-  } catch (err) {
-    return {
-      valid: false,
-      normalizedUrl: '',
-      error: `Invalid URL format: ${err instanceof Error ? err.message : String(err)}`,
-    };
-  }
-}
-
-export function resolveUrl(baseUrl: string, relativePath: string): string {
-  try {
-    return new URL(relativePath, baseUrl).toString();
+    parsed = new URL(trimmed);
   } catch {
-    return relativePath;
+    // If user entered e.g. "acme.com", auto-prepend https://
+    try {
+      parsed = new URL(`https://${trimmed}`);
+    } catch {
+      return { valid: false, reason: 'Malformed URL structure' };
+    }
   }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { valid: false, reason: `Unsupported protocol: ${parsed.protocol}` };
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Allow local addresses if configured (essential for Section 9 batch evaluate tests on localhost)
+  const isLocalAllowed = allowLocal || process.env.ALLOW_LOCAL_URLS === 'true' || process.env.NODE_ENV === 'test';
+
+  if (!isLocalAllowed) {
+    for (const pattern of PRIVATE_IP_PATTERNS) {
+      if (pattern.test(hostname)) {
+        return { valid: false, reason: `Access to private or loopback host '${hostname}' is restricted in production.` };
+      }
+    }
+  }
+
+  return { valid: true, normalizedUrl: parsed.toString() };
 }

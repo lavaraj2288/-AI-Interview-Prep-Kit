@@ -1,241 +1,180 @@
-import {
-  RoleRequirement,
-  KitQuestion,
-  KitSchedule,
-  ScheduleDay,
-} from '../../types/kit.js';
+import { KitQuestion, KitRequirement, KitSchedule, ScheduleDay } from '../../types/kit.js';
 
-interface ScoredQuestion {
-  question: KitQuestion;
-  score: number;
-  coversMust: boolean;
-  maxDifficulty: number;
-}
-
-/**
- * Deterministic arithmetic schedule allocation.
- * Pure application logic without LLM hallucinations.
- *
- * Constraints:
- * 1. Schedule length equals exactly `daysAvailable`.
- * 2. Every must-have requirement appears in at least one scheduled question.
- * 3. Harder (difficulty 3) and higher-priority (must-have) material lands earlier.
- * 4. All question durations and day totals are integer minutes.
- * 5. Every question_id in the schedule refers to an actual question in the kit.
- */
 export function allocateSchedule(
-  requirements: RoleRequirement[],
+  daysAvailable: number,
   questions: KitQuestion[],
-  daysAvailable: number
+  requirements: KitRequirement[]
 ): KitSchedule {
-  const safeDays = Math.max(1, Math.min(60, Math.floor(daysAvailable)));
+  // Enforce positive integer days
+  const validDays = Math.max(1, Math.round(daysAvailable));
 
   if (!questions || questions.length === 0) {
-    // Edge case: Empty questions (stub JD)
-    return {
-      days_available: safeDays,
-      days: Array.from({ length: safeDays }, (_, i) => ({
-        day: i + 1,
-        focus: i === 0 ? 'Initial Role Assessment' : 'Self-Directed Review',
+    // Edge case: No questions to allocate
+    const emptyDays: ScheduleDay[] = [];
+    for (let i = 1; i <= validDays; i++) {
+      emptyDays.push({
+        day: i,
+        focus: 'Foundational Review & Overview',
         question_ids: [],
-        minutes: 30,
-      })),
-    };
-  }
-
-  // Map requirements by id for quick lookup
-  const reqMap = new Map<string, RoleRequirement>();
-  for (const r of requirements) {
-    reqMap.set(r.id, r);
-  }
-
-  // Score each question: Must-have coverage and higher difficulty score higher
-  const scoredQuestions: ScoredQuestion[] = questions.map((q) => {
-    let coversMust = false;
-    let kindBonus = 0;
-
-    for (const rId of q.requirement_ids || []) {
-      const req = reqMap.get(rId);
-      if (req) {
-        if (req.priority === 'must') coversMust = true;
-        if (req.kind === 'technical') kindBonus = Math.max(kindBonus, 20);
-        if (req.kind === 'domain') kindBonus = Math.max(kindBonus, 15);
-        if (req.kind === 'behavioural') kindBonus = Math.max(kindBonus, 10);
-      }
+        minutes: 30
+      });
     }
+    return { days_available: validDays, days: emptyDays };
+  }
 
-    const catBonus =
-      q.category === 'system-design'
-        ? 30
-        : q.category === 'technical'
-        ? 25
-        : q.category === 'behavioural'
-        ? 15
-        : 10;
+  // Create lookup for requirement priority
+  const reqPriorityMap = new Map<string, 'must' | 'nice'>();
+  for (const r of requirements) {
+    reqPriorityMap.set(r.id, r.priority);
+  }
 
-    const diff = Number.isInteger(q.difficulty) ? q.difficulty : 2;
-    // Score: coversMust = +100, difficulty = diff * 20 (up to 60), category bonus up to 30
-    const score = (coversMust ? 100 : 0) + diff * 20 + catBonus + kindBonus;
+  // Calculate question weight:
+  // Harder questions (difficulty 3) and must-have requirements get highest weight
+  // to ensure they land earlier in the schedule
+  const scoredQuestions = questions.map(q => {
+    const hasMust = q.requirement_ids.some(rId => reqPriorityMap.get(rId) === 'must');
+    const priorityScore = hasMust ? 20 : 5;
+    const difficultyScore = (q.difficulty || 2) * 10;
+    const totalScore = priorityScore + difficultyScore;
+
+    // Time estimate based on difficulty (integer minutes)
+    const baseMinutes = q.difficulty === 3 ? 35 : q.difficulty === 2 ? 25 : 15;
 
     return {
       question: q,
-      score,
-      coversMust,
-      maxDifficulty: diff,
+      totalScore,
+      baseMinutes,
+      hasMust
     };
   });
 
-  // Sort descending: highest score (must-have + hard technical/system design) first!
-  scoredQuestions.sort((a, b) => b.score - a.score);
+  // Sort descending by score: hardest and highest-priority first
+  scoredQuestions.sort((a, b) => b.totalScore - a.totalScore);
 
-  // Separate must-have covering questions to guarantee every must-have requirement is scheduled
-  const mustReqIds = new Set(
-    requirements.filter((r) => r.priority === 'must').map((r) => r.id)
-  );
-
+  // Initialize schedule days
   const days: ScheduleDay[] = [];
-
-  if (safeDays === 1) {
-    // 1-Day Intensive: Schedule all questions, prioritizing must-haves
-    const qIds = scoredQuestions.map((sq) => sq.question.id);
-    const totalMinutes = Math.min(
-      240,
-      scoredQuestions.reduce(
-        (acc, sq) => acc + (sq.maxDifficulty === 3 ? 25 : sq.maxDifficulty === 2 ? 15 : 10),
-        0
-      )
-    );
-
+  for (let i = 1; i <= validDays; i++) {
     days.push({
-      day: 1,
-      focus: 'Intensive Cram: Core Must-Haves, Technicals & High-Impact Preparation',
-      question_ids: qIds,
-      minutes: Math.max(45, Math.round(totalMinutes)),
+      day: i,
+      focus: '',
+      question_ids: [],
+      minutes: 0
     });
-
-    return {
-      days_available: 1,
-      days,
-    };
   }
 
-  // Multi-day distribution
-  // Step 1: Ensure all must-have covering questions are scheduled in the early-to-mid days
-  // Partition scoredQuestions across days
-  const dayQuestionBuckets: KitQuestion[][] = Array.from(
-    { length: safeDays },
-    () => []
-  );
+  // Distribution strategy:
+  // Allocate questions prioritizing earlier days
+  if (validDays === 1) {
+    // Single-day intensive crunch
+    const allQIds = scoredQuestions.map(sq => sq.question.id);
+    const totalMinutes = scoredQuestions.reduce((acc, sq) => acc + sq.baseMinutes, 0);
+    days[0] = {
+      day: 1,
+      focus: 'Intensive Comprehensive Preparation (All Topics)',
+      question_ids: allQIds,
+      minutes: Math.max(60, totalMinutes)
+    };
+  } else if (validDays >= scoredQuestions.length) {
+    // More days available than questions (e.g. 60 days, 15 questions)
+    // Place prime questions on earlier days, subsequent days get revision or deep dives
+    for (let i = 0; i < scoredQuestions.length; i++) {
+      days[i].question_ids.push(scoredQuestions[i].question.id);
+      days[i].minutes = scoredQuestions[i].baseMinutes + 20; // extra deep-dive buffer
+    }
 
-  // If we have fewer questions than days, distribute questions and use spaced repetition / review for extra days
-  if (scoredQuestions.length <= safeDays) {
-    // Place one question per day for the first N days
-    scoredQuestions.forEach((sq, idx) => {
-      dayQuestionBuckets[idx].push(sq.question);
-    });
+    // Fill remaining days with targeted mock review of prime must-have questions
+    const primeQuestions = scoredQuestions.filter(sq => sq.hasMust).map(sq => sq.question.id);
+    const fallbackPool = primeQuestions.length > 0 ? primeQuestions : scoredQuestions.map(sq => sq.question.id);
 
-    // For days with no new questions, assign key questions for spaced repetition & review
-    // Hard questions get reviewed on later days
-    for (let d = scoredQuestions.length; d < safeDays; d++) {
-      // Pick 1-2 most important questions for review
-      const reviewTarget = scoredQuestions[(d - scoredQuestions.length) % scoredQuestions.length];
-      if (reviewTarget) {
-        dayQuestionBuckets[d].push(reviewTarget.question);
-      }
+    for (let i = scoredQuestions.length; i < validDays; i++) {
+      const pickQ = fallbackPool[(i - scoredQuestions.length) % fallbackPool.length];
+      days[i].question_ids.push(pickQ);
+      days[i].minutes = 30; // standard drill session
     }
   } else {
-    // More questions than days: allocate higher priority / harder questions to earlier days
-    // Weight each day: earlier days get more intense allocation
-    const totalQ = scoredQuestions.length;
-    let qIndex = 0;
+    // More questions than days (e.g. 5 days, 15 questions)
+    // Distribute earlier days with heavier/harder questions
+    // Partition questions across validDays with front-loaded distribution
+    let qIdx = 0;
+    const questionsPerDay = Math.ceil(scoredQuestions.length / validDays);
 
-    // Distribute all questions across safeDays
-    for (let dayIdx = 0; dayIdx < safeDays; dayIdx++) {
-      const remainingDays = safeDays - dayIdx;
-      const remainingQuestions = totalQ - qIndex;
-
-      // Base share of questions for this day
-      let share = Math.ceil(remainingQuestions / remainingDays);
-      if (share < 1) share = 1;
-
-      for (let i = 0; i < share && qIndex < totalQ; i++) {
-        dayQuestionBuckets[dayIdx].push(scoredQuestions[qIndex].question);
-        qIndex++;
-      }
-    }
-
-    // If any question left due to rounding, append to middle days
-    while (qIndex < totalQ) {
-      const targetDay = Math.min(safeDays - 1, Math.floor(safeDays / 2));
-      dayQuestionBuckets[targetDay].push(scoredQuestions[qIndex].question);
-      qIndex++;
-    }
-  }
-
-  // Step 2: Verify that EVERY must-have requirement appears somewhere in the schedule
-  const scheduledReqIds = new Set<string>();
-  for (const bucket of dayQuestionBuckets) {
-    for (const q of bucket) {
-      for (const rId of q.requirement_ids || []) {
-        scheduledReqIds.add(rId);
-      }
-    }
-  }
-
-  // If any must-have requirement was missed in questions, find any question covering it and inject into Day 1 or Day 2
-  for (const mustReqId of mustReqIds) {
-    if (!scheduledReqIds.has(mustReqId)) {
-      const candidateQ = questions.find((q) =>
-        (q.requirement_ids || []).includes(mustReqId)
+    for (let dayIdx = 0; dayIdx < validDays; dayIdx++) {
+      // Allocate chunk for today
+      const remainingQuestions = scoredQuestions.length - qIdx;
+      const remainingDays = validDays - dayIdx;
+      const countForToday = Math.min(
+        remainingQuestions,
+        Math.max(1, Math.ceil(remainingQuestions / remainingDays))
       );
-      if (candidateQ) {
-        dayQuestionBuckets[0].unshift(candidateQ);
-        scheduledReqIds.add(mustReqId);
+
+      for (let c = 0; c < countForToday && qIdx < scoredQuestions.length; c++) {
+        days[dayIdx].question_ids.push(scoredQuestions[qIdx].question.id);
+        days[dayIdx].minutes += scoredQuestions[qIdx].baseMinutes;
+        qIdx++;
+      }
+
+      // Ensure a reasonable minimum integer duration per day
+      if (days[dayIdx].minutes < 45) {
+        days[dayIdx].minutes = 45;
       }
     }
   }
 
-  // Step 3: Compute focus, minutes and format ScheduleDay for each day
-  for (let d = 0; d < safeDays; d++) {
-    const bucket = dayQuestionBuckets[d];
-    const dayNum = d + 1;
+  // Ensure every must-have requirement appears somewhere in the schedule
+  const mustReqs = requirements.filter(r => r.priority === 'must');
+  const scheduledQuestionIds = new Set<string>();
+  for (const d of days) {
+    for (const qId of d.question_ids) {
+      scheduledQuestionIds.add(qId);
+    }
+  }
 
-    // Calculate integer minutes based on difficulty
-    const dayMinutes = bucket.reduce((sum, q) => {
-      const diff = q.difficulty || 2;
-      return sum + (diff === 3 ? 25 : diff === 2 ? 15 : 10);
-    }, 0);
+  // Check if any must-have requirement's questions were missed
+  for (const mustReq of mustReqs) {
+    const coveringQuestions = questions.filter(q => q.requirement_ids.includes(mustReq.id));
+    const isCoveredInSchedule = coveringQuestions.some(q => scheduledQuestionIds.has(q.id));
 
-    const minutes = Math.max(30, Math.min(180, Math.round(dayMinutes)));
+    if (!isCoveredInSchedule && coveringQuestions.length > 0) {
+      // Add the covering question to Day 1 or Day 2
+      const targetDay = days.length > 1 ? days[0] : days[0];
+      const qToAdd = coveringQuestions[0].id;
+      if (!targetDay.question_ids.includes(qToAdd)) {
+        targetDay.question_ids.unshift(qToAdd);
+        targetDay.minutes += 25;
+      }
+    }
+  }
 
-    // Determine focus title based on day position and categories
-    const categories = Array.from(new Set(bucket.map((q) => q.category)));
-    let focus = '';
+  // Assign descriptive focuses per day based on categories present
+  const questionMap = new Map(questions.map(q => [q.id, q]));
+  for (let i = 0; i < days.length; i++) {
+    const day = days[i];
+    const categoriesOnDay = day.question_ids
+      .map(qId => questionMap.get(qId)?.category)
+      .filter((cat): cat is NonNullable<typeof cat> => Boolean(cat));
 
-    if (dayNum === 1) {
-      focus = 'Core Must-Haves & Foundational Deep Dive';
-    } else if (dayNum === safeDays) {
-      focus = 'Final Polish, Company Alignment & Mock Drills';
-    } else if (categories.includes('system-design')) {
-      focus = 'System Architecture, Scalability & Design Trade-offs';
-    } else if (categories.includes('technical')) {
-      focus = 'Technical Mastery & Practical Problem Solving';
-    } else if (categories.includes('behavioural')) {
-      focus = 'Leadership, Behavioral Scenarios & STAR Responses';
+    const uniqueCats = Array.from(new Set(categoriesOnDay));
+
+    if (uniqueCats.includes('system-design') && uniqueCats.includes('technical')) {
+      day.focus = 'Architecture, System Design & Core Technical Deep-Dive';
+    } else if (uniqueCats.includes('technical')) {
+      day.focus = 'Technical Mastery & Code Implementation';
+    } else if (uniqueCats.includes('behavioural')) {
+      day.focus = 'STAR Stories, Mentorship & Behavioural Competencies';
+    } else if (uniqueCats.includes('company-fit')) {
+      day.focus = 'Company Culture, Values & Final Alignment';
+    } else if (i === days.length - 1 && days.length > 2) {
+      day.focus = 'Final Polish, Key Concepts & Mock Simulation';
     } else {
-      focus = `Day ${dayNum} Focus: ${categories.join(' & ') || 'Comprehensive Review'}`;
+      day.focus = `Core Review: ${uniqueCats.join(' & ') || 'Comprehensive Prep'}`;
     }
 
-    days.push({
-      day: dayNum,
-      focus,
-      question_ids: bucket.map((q) => q.id),
-      minutes,
-    });
+    // Round minutes to clean integer
+    day.minutes = Math.round(day.minutes);
   }
 
   return {
-    days_available: safeDays,
-    days,
+    days_available: validDays,
+    days
   };
 }

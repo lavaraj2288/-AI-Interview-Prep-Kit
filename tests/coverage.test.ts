@@ -1,69 +1,69 @@
 import { describe, it, expect } from 'vitest';
-import { checkCoverage } from '../server/src/services/pipeline/coverageChecker.js';
-import { RoleRequirement, KitQuestion } from '../server/src/types/kit.js';
+import { checkRequirementCoverage } from '../server/src/services/pipeline/coverageChecker.js';
+import { KitQuestion, KitRequirement } from '../server/src/types/kit.js';
 
-describe('Coverage Checker (Deterministic)', () => {
-  const mockRequirements: RoleRequirement[] = [
-    { id: 'r1', text: 'Expert in TypeScript', kind: 'technical', priority: 'must' },
-    { id: 'r2', text: 'Experience leading agile sprints', kind: 'behavioural', priority: 'must' },
-    { id: 'r3', text: 'Knowledge of AWS CloudFormation', kind: 'domain', priority: 'nice' },
+describe('Coverage Checker & Second Pass Logic', () => {
+  const requirements: KitRequirement[] = [
+    { id: 'r1', text: '5+ years with React', kind: 'technical', priority: 'must' },
+    { id: 'r2', text: 'GraphQL architecture', kind: 'technical', priority: 'must' },
+    { id: 'r3', text: 'Mentoring junior developers', kind: 'behavioural', priority: 'must' },
+    { id: 'r4', text: 'Docker containerization', kind: 'technical', priority: 'nice' }
   ];
 
-  it('detects uncovered requirements accurately', () => {
-    // Only r1 covered
-    const partialQuestions: KitQuestion[] = [
-      {
-        id: 'q1',
-        requirement_ids: ['r1'],
-        category: 'technical',
-        prompt: 'TypeScript generics questions',
-        answer_outline: 'Explain type constraints',
-        difficulty: 2,
-      },
+  it('detects 100% coverage when all requirements are referenced', () => {
+    const questions: KitQuestion[] = [
+      { id: 'q1', requirement_ids: ['r1'], category: 'technical', prompt: 'P1', answer_outline: 'A1', difficulty: 2 },
+      { id: 'q2', requirement_ids: ['r2', 'r4'], category: 'technical', prompt: 'P2', answer_outline: 'A2', difficulty: 2 },
+      { id: 'q3', requirement_ids: ['r3'], category: 'behavioural', prompt: 'P3', answer_outline: 'A3', difficulty: 1 }
     ];
 
-    const result = checkCoverage(mockRequirements, partialQuestions, 0);
-    expect(result.hasGaps).toBe(true);
-    expect(result.hasMustGaps).toBe(true);
-    expect(result.coverage.uncovered_requirement_ids).toEqual(['r2', 'r3']);
-    expect(result.uncoveredMustRequirements.map((r) => r.id)).toEqual(['r2']);
-    expect(result.uncoveredNiceRequirements.map((r) => r.id)).toEqual(['r3']);
-    expect(result.coverage.passes).toBe(1);
+    const result = checkRequirementCoverage(requirements, questions);
+    expect(result.uncoveredRequirementIds.length).toBe(0);
+    expect(result.uncoveredMustHaves.length).toBe(0);
+    expect(result.coverageRatio).toBe(1.0);
   });
 
-  it('returns no gaps when all requirements are covered', () => {
-    const fullQuestions: KitQuestion[] = [
-      {
-        id: 'q1',
-        requirement_ids: ['r1'],
-        category: 'technical',
-        prompt: 'TypeScript generics',
-        answer_outline: 'Type bounds',
-        difficulty: 2,
-      },
-      {
-        id: 'q2',
-        requirement_ids: ['r2'],
-        category: 'behavioural',
-        prompt: 'Sprint leadership',
-        answer_outline: 'Agile rituals',
-        difficulty: 2,
-      },
-      {
-        id: 'q3',
-        requirement_ids: ['r3'],
-        category: 'technical',
-        prompt: 'AWS infrastructure',
-        answer_outline: 'CloudFormation stacks',
-        difficulty: 2,
-      },
+  it('detects gaps when must-have requirements are missing', () => {
+    // Only q1 referencing r1 is present. r2 (must), r3 (must), and r4 (nice) are missing.
+    const questions: KitQuestion[] = [
+      { id: 'q1', requirement_ids: ['r1'], category: 'technical', prompt: 'P1', answer_outline: 'A1', difficulty: 2 }
     ];
 
-    const result = checkCoverage(mockRequirements, fullQuestions, 1);
-    expect(result.hasGaps).toBe(false);
-    expect(result.hasMustGaps).toBe(false);
-    expect(result.coverage.uncovered_requirement_ids).toEqual([]);
-    expect(result.coverage.passes).toBe(2);
-    expect(result.coverageRatio).toBe(1.0);
+    const result = checkRequirementCoverage(requirements, questions);
+    expect(result.uncoveredRequirementIds).toContain('r2');
+    expect(result.uncoveredRequirementIds).toContain('r3');
+    expect(result.uncoveredRequirementIds).toContain('r4');
+    expect(result.uncoveredMustHaves.map(r => r.id)).toEqual(['r2', 'r3']);
+    expect(result.uncoveredNiceToHaves.map(r => r.id)).toEqual(['r4']);
+    expect(result.coverageRatio).toBe(0.25);
+  });
+
+  it('simulates second pass closing the coverage gap', () => {
+    let questions: KitQuestion[] = [
+      { id: 'q1', requirement_ids: ['r1'], category: 'technical', prompt: 'P1', answer_outline: 'A1', difficulty: 2 }
+    ];
+
+    // First pass check
+    let firstPassResult = checkRequirementCoverage(requirements, questions);
+    expect(firstPassResult.uncoveredMustHaves.length).toBe(2);
+
+    // Second pass: generate questions targeting the uncovered must-haves
+    const gapClosingQuestions: KitQuestion[] = firstPassResult.uncoveredMustHaves.map((req, i) => ({
+      id: `q_gap_${i + 1}`,
+      requirement_ids: [req.id],
+      category: req.kind === 'behavioural' ? 'behavioural' : 'technical',
+      prompt: `Gap question for ${req.text}`,
+      answer_outline: 'Answer outline',
+      difficulty: 2
+    }));
+
+    questions = [...questions, ...gapClosingQuestions];
+
+    // Second pass check
+    const secondPassResult = checkRequirementCoverage(requirements, questions);
+    expect(secondPassResult.uncoveredMustHaves.length).toBe(0);
+    expect(secondPassResult.coveredRequirementIds).toContain('r1');
+    expect(secondPassResult.coveredRequirementIds).toContain('r2');
+    expect(secondPassResult.coveredRequirementIds).toContain('r3');
   });
 });

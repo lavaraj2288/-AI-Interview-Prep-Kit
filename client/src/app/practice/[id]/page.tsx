@@ -1,320 +1,276 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { practiceApi } from '@/lib/api';
+import { api } from '../../../lib/api';
+import {
+  ArrowLeft, ArrowRight, RotateCw, CheckCircle2, AlertTriangle,
+  Award, Layers, Keyboard, Sparkles, BookOpen
+} from 'lucide-react';
 
-export default function PracticePage() {
-  const { id } = useParams();
-  const router = useRouter();
-  const kitId = id as string;
-
-  const [sessionData, setSessionData] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function PracticeModePage() {
+  const { id } = useParams<{ id: string }>();
+  const [sessionData, setSessionData] = useState<any>(null);
+  const [cards, setCards] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [recording, setRecording] = useState(false);
 
-  useEffect(() => {
-    loadSession();
-  }, [kitId]);
-
-  const loadSession = async () => {
-    setLoading(true);
+  const fetchSession = useCallback(async () => {
+    if (!id) return;
     try {
-      const data = await practiceApi.getSession(kitId);
+      setLoading(true);
+      const data = await api.getPracticeSession(id);
       setSessionData(data);
+      setCards(data.prioritizedCards || []);
       setCurrentIndex(0);
       setIsFlipped(false);
-    } catch (err) {
-      console.error('Failed to load practice session:', err);
+    } catch {
+      // fallback
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const currentCard = sessionData?.orderedCards?.[currentIndex] || null;
-  const isLastCard = sessionData?.orderedCards ? currentIndex === sessionData.orderedCards.length - 1 : true;
+  useEffect(() => {
+    fetchSession();
+  }, [fetchSession]);
 
-  const handleRateConfidence = async (confidence: number) => {
-    if (!sessionData || !currentCard) return;
+  const currentCard = cards[currentIndex];
+
+  const handleRate = async (confidence: number) => {
+    if (!id || !currentCard || recording) return;
     setRecording(true);
-
     try {
-      await practiceApi.recordConfidence(kitId, currentCard.id, confidence);
+      await api.recordReview(id, currentCard.id, confidence);
 
-      // Update card in local state
-      const updatedCards = [...sessionData.orderedCards];
-      updatedCards[currentIndex].confidence = confidence;
-      updatedCards[currentIndex].isCovered = true;
-
-      const coveredCount = updatedCards.filter((c) => c.isCovered).length;
-      const progress = Math.round((coveredCount / updatedCards.length) * 100);
-
-      setSessionData({
-        ...sessionData,
-        orderedCards: updatedCards,
-        coveredCards: coveredCount,
-        uncoveredCards: updatedCards.length - coveredCount,
-        progressPercentage: progress,
-      });
-
-      // Move to next card or loop
-      if (currentIndex < updatedCards.length - 1) {
-        setCurrentIndex(currentIndex + 1);
+      // Advance to next card or loop
+      if (currentIndex + 1 < cards.length) {
+        setCurrentIndex(prev => prev + 1);
         setIsFlipped(false);
       } else {
-        // Completed current pass
+        // Finished deck round
         setIsFlipped(false);
       }
-    } catch (err) {
-      alert('Failed to record confidence rating.');
+
+      // Refresh background stats
+      api.getPracticeSession(id).then(res => setSessionData(res));
+    } catch (err: any) {
+      alert(err.message || 'Failed to record review');
     } finally {
       setRecording(false);
     }
   };
 
-  // Keyboard navigation for accessibility and rapid practice
+  // Keyboard navigation (Section 12: keyboard accessible)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Avoid firing if user is inside an input or textarea
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+      // Don't intercept if user is typing in an input
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
 
-      if (e.code === 'Space' || e.key === 'Enter') {
+      if (e.code === 'Space') {
         e.preventDefault();
-        setIsFlipped((prev) => !prev);
-      } else if (e.key === 'ArrowRight' || e.key === 'j') {
-        e.preventDefault();
-        if (sessionData && currentIndex < sessionData.orderedCards.length - 1) {
-          setCurrentIndex((prev) => prev + 1);
-          setIsFlipped(false);
-        }
-      } else if (e.key === 'ArrowLeft' || e.key === 'k') {
-        e.preventDefault();
-        if (currentIndex > 0) {
-          setCurrentIndex((prev) => prev - 1);
-          setIsFlipped(false);
-        }
+        setIsFlipped(prev => !prev);
       } else if (e.key === '1') {
         e.preventDefault();
-        handleRateConfidence(1);
+        handleRate(1);
       } else if (e.key === '2') {
         e.preventDefault();
-        handleRateConfidence(2);
+        handleRate(2);
       } else if (e.key === '3') {
         e.preventDefault();
-        handleRateConfidence(3);
+        handleRate(3);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (currentIndex + 1 < cards.length) {
+          setCurrentIndex(prev => prev + 1);
+          setIsFlipped(false);
+        }
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (currentIndex > 0) {
+          setCurrentIndex(prev => prev - 1);
+          setIsFlipped(false);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [sessionData, currentIndex, currentCard]);
+  }, [currentIndex, cards.length, isFlipped, id, currentCard, recording]);
 
   if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-12 text-slate-500 text-sm">
-        Loading Practice Session...
-      </div>
-    );
+    return <div className="py-20 text-center text-slate-400">Loading Practice Deck...</div>;
   }
 
-  if (!sessionData || sessionData.orderedCards.length === 0) {
+  if (!cards || cards.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-        <h2 className="text-xl font-bold text-slate-800 mb-2">No Flashcards Found</h2>
-        <p className="text-sm text-slate-500 mb-4">This kit doesn't have any flashcards yet.</p>
-        <Link href={`/kit/${kitId}`} className="text-blue-600 font-semibold hover:underline">
-          Return to Kit Builder
+      <div className="py-20 text-center space-y-4">
+        <h2 className="text-xl font-bold text-white">No flashcards available in this kit</h2>
+        <Link href={`/kit/${id}`} className="text-emerald-400 hover:underline">
+          Return to Builder to generate or add cards
         </Link>
       </div>
     );
   }
 
+  const breakdown = sessionData?.breakdown || { hard: 0, good: 0, easy: 0, unseen: cards.length };
+  const progressPercent = Math.round(((sessionData?.coveredCards || 0) / cards.length) * 100);
+
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full flex-1 flex flex-col justify-between">
-      {/* Practice Header & Progress */}
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 mb-6 gap-3">
-          <div>
-            <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
-              Practice Mode • Spaced Repetition
-            </span>
-            <h1 className="text-2xl font-bold text-slate-900 mt-1">{sessionData.kitTitle}</h1>
-          </div>
+    <div className="max-w-3xl mx-auto space-y-8 pb-16">
+      {/* Top Header */}
+      <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <Link
+          href={`/kit/${id}`}
+          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Kit Builder
+        </Link>
+
+        <button
+          onClick={fetchSession}
+          className="flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition"
+        >
+          <RotateCw className="w-3.5 h-3.5" />
+          Reorder by Weakest Spots
+        </button>
+      </div>
+
+      {/* Progress & Stats Bar */}
+      <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-3">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-semibold text-white">
+            Deck Progress: {sessionData?.coveredCards || 0} / {cards.length} Cards Covered ({progressPercent}%)
+          </span>
           <div className="flex items-center gap-3">
-            <button
-              onClick={loadSession}
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200"
-            >
-              🔄 Reorder by Weak Spots
-            </button>
-            <Link
-              href={`/kit/${kitId}`}
-              className="text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white px-3 py-1.5 rounded-lg border border-slate-300"
-            >
-              Back to Builder
-            </Link>
+            <span className="text-red-400 font-medium">Hard: {breakdown.hard}</span>
+            <span className="text-amber-400 font-medium">Good: {breakdown.good}</span>
+            <span className="text-emerald-400 font-medium">Easy: {breakdown.easy}</span>
+            <span className="text-slate-500">Unseen: {breakdown.unseen}</span>
           </div>
         </div>
 
-        {/* Coverage Progress Bar */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 mb-8 shadow-sm">
-          <div className="flex justify-between items-center text-xs font-semibold text-slate-600 mb-2">
-            <span>
-              Card {currentIndex + 1} of {sessionData.totalCards}
-            </span>
-            <span>
-              Coverage: {sessionData.coveredCards}/{sessionData.totalCards} ({sessionData.progressPercentage}%)
-            </span>
-          </div>
-          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-            <div
-              className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${sessionData.progressPercentage}%` }}
-            ></div>
-          </div>
+        <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden flex">
+          <div style={{ width: `${(breakdown.hard / cards.length) * 100}%` }} className="bg-red-500 transition-all duration-300" />
+          <div style={{ width: `${(breakdown.good / cards.length) * 100}%` }} className="bg-amber-500 transition-all duration-300" />
+          <div style={{ width: `${(breakdown.easy / cards.length) * 100}%` }} className="bg-emerald-500 transition-all duration-300" />
         </div>
       </div>
 
-      {/* 3D Flashcard Presentation */}
-      <div className="flex-1 flex flex-col justify-center items-center my-6">
+      {/* The 3D Interactive Card */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <span>Card {currentIndex + 1} of {cards.length}</span>
+          <span>Requirement: {currentCard?.requirement_ids?.join(', ') || 'Core'}</span>
+        </div>
+
         <div
-          onClick={() => setIsFlipped(!isFlipped)}
-          className="w-full max-w-xl h-80 cursor-pointer select-none perspective-1000 group"
+          onClick={() => setIsFlipped(prev => !prev)}
+          className="relative min-h-[300px] w-full rounded-3xl p-8 cursor-pointer select-none transition-all duration-300 bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 hover:border-slate-700 shadow-2xl flex flex-col justify-between"
         >
-          <div
-            className={`relative w-full h-full duration-500 transform-style-3d transition-transform ${
-              isFlipped ? 'rotate-y-180' : ''
-            }`}
-          >
-            {/* Front of Card */}
-            <div className="absolute inset-0 w-full h-full bg-white rounded-2xl border-2 border-slate-200 p-8 flex flex-col justify-between shadow-lg backface-hidden group-hover:border-indigo-300 transition">
-              <div className="flex justify-between items-center text-xs text-slate-400">
-                <span className="font-bold uppercase tracking-wider text-[10px]">Concept / Question</span>
-                {currentCard.confidence && (
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      currentCard.confidence === 1
-                        ? 'bg-red-100 text-red-700'
-                        : currentCard.confidence === 2
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-emerald-100 text-emerald-700'
-                    }`}
-                  >
-                    Confidence: {currentCard.confidence}/3
-                  </span>
-                )}
-              </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-mono text-emerald-400 font-bold">[{currentCard.id}]</span>
+            <span className="text-slate-500 uppercase tracking-wider text-[10px]">
+              {isFlipped ? 'Answer Key (Revealed)' : 'Question Prompt (Click to Flip)'}
+            </span>
+          </div>
 
-              <div className="text-center my-auto">
-                <p className="text-lg sm:text-xl font-bold text-slate-900 leading-relaxed">
-                  {currentCard.front}
-                </p>
-              </div>
-
-              <div className="text-center text-xs text-indigo-600 font-medium">
-                Click anywhere to flip & reveal answer outline ↻
-              </div>
-            </div>
-
-            {/* Back of Card */}
-            <div className="absolute inset-0 w-full h-full bg-indigo-900 text-white rounded-2xl border-2 border-indigo-700 p-8 flex flex-col justify-between shadow-lg backface-hidden rotate-y-180">
-              <div className="flex justify-between items-center text-xs text-indigo-200">
-                <span className="font-bold uppercase tracking-wider text-[10px]">Answer / Key Takeaways</span>
-                <span className="text-[10px] text-indigo-300">Click to flip back</span>
-              </div>
-
-              <div className="text-left my-auto overflow-y-auto max-h-48 pr-2">
-                <p className="text-sm text-indigo-100 leading-relaxed whitespace-pre-wrap">
+          <div className="py-6 my-auto text-center space-y-4">
+            {!isFlipped ? (
+              <p className="text-xl sm:text-2xl font-bold text-white leading-relaxed">
+                {currentCard.front}
+              </p>
+            ) : (
+              <div className="space-y-3 text-left">
+                <p className="text-base text-slate-200 leading-relaxed font-normal">
                   {currentCard.back}
                 </p>
               </div>
+            )}
+          </div>
 
-              <div className="text-center text-[11px] text-indigo-300">
-                Rate your confidence below to schedule your next review
-              </div>
-            </div>
+          <div className="text-center text-xs text-slate-500">
+            {isFlipped ? 'Rate confidence below or press 1, 2, or 3' : 'Click card or press Space to reveal'}
           </div>
         </div>
       </div>
 
-      {/* Confidence Rating Bar */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm max-w-xl mx-auto w-full">
-        <p className="text-xs font-bold text-slate-700 uppercase tracking-wider text-center mb-3">
-          How confident do you feel on this topic?
-        </p>
-
+      {/* Confidence Rating Controls (Section 7) */}
+      <div className="space-y-4">
         <div className="grid grid-cols-3 gap-3">
           <button
-            onClick={() => handleRateConfidence(1)}
+            onClick={() => handleRate(1)}
             disabled={recording}
-            className="py-2.5 px-3 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl font-bold text-xs shadow-sm transition active:scale-95 disabled:opacity-50 flex flex-col items-center"
+            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-semibold transition"
           >
-            <span>Needs Work</span>
-            <span className="text-[10px] font-normal text-red-500">Low (Review soon)</span>
+            <span className="text-sm">1. Again (Hard)</span>
+            <span className="text-[10px] text-red-500/80 font-normal">Review first next session</span>
           </button>
 
           <button
-            onClick={() => handleRateConfidence(2)}
+            onClick={() => handleRate(2)}
             disabled={recording}
-            className="py-2.5 px-3 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl font-bold text-xs shadow-sm transition active:scale-95 disabled:opacity-50 flex flex-col items-center"
+            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-semibold transition"
           >
-            <span>Getting There</span>
-            <span className="text-[10px] font-normal text-amber-600">Medium</span>
+            <span className="text-sm">2. Good</span>
+            <span className="text-[10px] text-amber-500/80 font-normal">Moderate confidence</span>
           </button>
 
           <button
-            onClick={() => handleRateConfidence(3)}
+            onClick={() => handleRate(3)}
             disabled={recording}
-            className="py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl font-bold text-xs shadow-sm transition active:scale-95 disabled:opacity-50 flex flex-col items-center"
+            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-semibold transition"
           >
-            <span>Mastered</span>
-            <span className="text-[10px] font-normal text-emerald-600">High (Spaced out)</span>
+            <span className="text-sm">3. Easy</span>
+            <span className="text-[10px] text-emerald-500/80 font-normal">Mastered concept</span>
           </button>
         </div>
 
-        {/* Card Navigation */}
-        <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-100 text-xs">
+        {/* Card Switchers & Keyboard Hints */}
+        <div className="flex items-center justify-between text-xs text-slate-400 pt-2">
           <button
             onClick={() => {
               if (currentIndex > 0) {
-                setCurrentIndex(currentIndex - 1);
+                setCurrentIndex(prev => prev - 1);
                 setIsFlipped(false);
               }
             }}
             disabled={currentIndex === 0}
-            className="text-slate-500 hover:text-slate-800 disabled:opacity-30 font-medium"
+            className="flex items-center gap-1 disabled:opacity-30 hover:text-white"
           >
-            ← Previous Card
+            <ArrowLeft className="w-3.5 h-3.5" /> Previous
           </button>
 
-          <span className="text-slate-400">
-            {currentIndex + 1} / {sessionData.orderedCards.length}
-          </span>
+          <div className="hidden sm:flex items-center gap-3 text-[11px] text-slate-500">
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">Space</kbd> Flip
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">1-3</kbd> Rate
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">← / →</kbd> Navigate
+            </span>
+          </div>
 
           <button
             onClick={() => {
-              if (!isLastCard) {
-                setCurrentIndex(currentIndex + 1);
+              if (currentIndex + 1 < cards.length) {
+                setCurrentIndex(prev => prev + 1);
                 setIsFlipped(false);
               }
             }}
-            disabled={isLastCard}
-            className="text-slate-500 hover:text-slate-800 disabled:opacity-30 font-medium"
+            disabled={currentIndex + 1 >= cards.length}
+            className="flex items-center gap-1 disabled:opacity-30 hover:text-white"
           >
-            Next Card →
+            Next <ArrowRight className="w-3.5 h-3.5" />
           </button>
-        </div>
-
-        {/* Keyboard accessibility helper */}
-        <div className="hidden sm:flex justify-center items-center gap-3 mt-3 pt-2 text-[10px] text-slate-400 font-mono">
-          <span><kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600">Space</kbd> Flip</span>
-          <span>•</span>
-          <span><kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600">1</kbd> <kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600">2</kbd> <kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600">3</kbd> Rate</span>
-          <span>•</span>
-          <span><kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600">←</kbd> <kbd className="px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600">→</kbd> Move</span>
         </div>
       </div>
     </div>

@@ -1,445 +1,324 @@
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import { AuthenticatedRequest } from '../middleware/auth.js';
+import { KitPipelineOrchestrator } from '../services/pipeline/orchestrator.js';
+import { fallbackStore, StoredKit } from '../services/storage/fallbackStore.js';
 import { Kit } from '../models/Kit.js';
-import { PrepKit, KitQuestion, QuestionCategory } from '../types/kit.js';
-import { runPrepKitPipeline } from '../services/pipeline/orchestrator.js';
-import { validatePrepKit } from '../services/pipeline/kitValidator.js';
-import { checkCoverage } from '../services/pipeline/coverageChecker.js';
 import { allocateSchedule } from '../services/pipeline/scheduleAllocator.js';
-import { defaultLLMClient } from '../services/llm/llmClient.js';
-import { buildCategoryQuestionsPrompt, buildCompanyBriefPrompt } from '../services/llm/prompts.js';
-import { FallbackStore } from '../services/storage/fallbackStore.js';
+import { checkRequirementCoverage } from '../services/pipeline/coverageChecker.js';
+import { AppendixAKit, KitQuestion } from '../types/kit.js';
 
-export async function createKit(
-  req: AuthenticatedRequest,
-  res: Response
-): Promise<void> {
+const orchestrator = new KitPipelineOrchestrator();
+
+const isDbConnected = () => mongoose.connection.readyState === 1;
+
+export async function createKit(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const { jd, company_url, days } = req.body;
+    const { jd, company_url, days, company_name } = req.body;
 
-    if (!jd || !company_url) {
-      res.status(400).json({ error: 'Job description and company website URL are required.' });
+    if (!jd || typeof jd !== 'string' || jd.trim().length === 0) {
+      res.status(400).json({ error: 'Job description (jd) is required' });
       return;
     }
 
-    const safeDays = Math.max(1, Math.min(60, parseInt(days, 10) || 5));
+    if (!company_url || typeof company_url !== 'string') {
+      res.status(400).json({ error: 'Company website URL (company_url) is required' });
+      return;
+    }
 
-    const pipelineResult = await runPrepKitPipeline({
-      jd,
-      companyUrl: company_url,
-      days: safeDays,
+    const numDays = Math.max(1, parseInt(days || '5', 10));
+    const userId = req.user?.id || 'guest_user';
+
+    const generatedKit = await orchestrator.runPipeline({
+      jd: jd.trim(),
+      companyUrl: company_url.trim(),
+      days: numDays,
+      companyName: company_name
     });
 
-    if (!pipelineResult.success || !pipelineResult.kit) {
-      res.status(422).json({
-        error: pipelineResult.error?.message || 'Failed to generate interview prep kit.',
-        code: pipelineResult.error?.code || 'GENERATION_FAILED',
-      });
-      return;
-    }
+    const kitId = `kit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const now = new Date();
 
-    if (!FallbackStore.isMongoConnected()) {
-      const fakeId = `mem_kit_${Date.now()}`;
-      const memDoc = {
-        _id: fakeId,
-        userId: req.userId || 'anon',
-        title: `${pipelineResult.kit.role.title} at ${pipelineResult.kit.source.company}`,
-        company: pipelineResult.kit.source.company,
-        kit: pipelineResult.kit,
-        status: 'ready' as const,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      FallbackStore.kits.set(fakeId, memDoc);
-      res.status(201).json({
-        message: 'Interview Prep Kit generated successfully (in-memory mode)',
-        kitId: fakeId,
-        kit: pipelineResult.kit,
-      });
-      return;
-    }
+    const stored: StoredKit = {
+      id: kitId,
+      userId,
+      kit: generatedKit,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString()
+    };
 
-    const newKitDoc = await Kit.create({
-      userId: req.userId,
-      title: `${pipelineResult.kit.role.title} at ${pipelineResult.kit.source.company}`,
-      company: pipelineResult.kit.source.company,
-      kit: pipelineResult.kit,
-      status: 'ready',
-    });
+    // Always keep fallbackStore updated
+    fallbackStore.saveKit(stored);
+
+    // Primary persistence to MongoDB when connected
+    if (isDbConnected()) {
+      try {
+        await Kit.create({
+          _id: kitId,
+          userId,
+          kit: generatedKit,
+          createdAt: now,
+          updatedAt: now
+        });
+      } catch (dbErr: any) {
+        console.warn(`[KitController] MongoDB write error: ${dbErr.message}`);
+      }
+    }
 
     res.status(201).json({
-      message: 'Interview Prep Kit generated successfully',
-      kitId: newKitDoc._id,
-      kit: pipelineResult.kit,
+      id: kitId,
+      kit: generatedKit
     });
-  } catch (err) {
-    console.error('Create kit error:', err);
-    res.status(500).json({ error: 'Internal server error while creating kit.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to generate interview prep kit', details: err.message });
   }
 }
 
-export async function getUserKits(
-  req: AuthenticatedRequest,
-  res: Response
-): Promise<void> {
+export async function getKits(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    if (!FallbackStore.isMongoConnected()) {
-      const userKits = Array.from(FallbackStore.kits.values())
-        .filter((k) => k.userId === req.userId)
-        .map((k) => ({
-          _id: k._id,
-          title: k.title,
-          company: k.company,
-          kit: {
-            coverage: k.kit.coverage,
-            schedule: { days_available: k.kit.schedule.days_available },
-          },
-          createdAt: k.createdAt,
-          updatedAt: k.updatedAt,
-        }));
-      res.status(200).json({ kits: userKits });
-      return;
-    }
+    const userId = req.user?.id || 'guest_user';
 
-    const kits = await Kit.find({ userId: req.userId })
-      .sort({ createdAt: -1 })
-      .select('_id title company kit.coverage kit.schedule.days_available createdAt updatedAt');
-
-    res.status(200).json({ kits });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to retrieve kits.' });
-  }
-}
-
-export async function getKitById(
-  req: AuthenticatedRequest,
-  res: Response
-): Promise<void> {
-  try {
-    if (!FallbackStore.isMongoConnected()) {
-      const memDoc = FallbackStore.kits.get(String(req.params.id));
-      if (!memDoc || memDoc.userId !== req.userId) {
-        res.status(404).json({ error: 'Kit not found or access denied.' });
-        return;
-      }
-      res.status(200).json({
-        id: memDoc._id,
-        title: memDoc.title,
-        company: memDoc.company,
-        kit: memDoc.kit,
-        createdAt: memDoc.createdAt,
-        updatedAt: memDoc.updatedAt,
-      });
-      return;
-    }
-
-    const kitDoc = await Kit.findOne({ _id: req.params.id, userId: req.userId });
-    if (!kitDoc) {
-      res.status(404).json({ error: 'Kit not found or access denied.' });
-      return;
-    }
-
-    res.status(200).json({
-      id: kitDoc._id,
-      title: kitDoc.title,
-      company: kitDoc.company,
-      kit: kitDoc.kit,
-      createdAt: kitDoc.createdAt,
-      updatedAt: kitDoc.updatedAt,
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to retrieve kit.' });
-  }
-}
-
-export async function updateKit(
-  req: AuthenticatedRequest,
-  res: Response
-): Promise<void> {
-  try {
-    const { kit } = req.body;
-    if (!kit) {
-      res.status(400).json({ error: 'Updated kit payload is required.' });
-      return;
-    }
-
-    // Validate structure
-    const validation = validatePrepKit(kit);
-    if (!validation.valid) {
-      res.status(400).json({
-        error: 'Invalid kit structure',
-        details: validation.errors,
-      });
-      return;
-    }
-
-    if (!FallbackStore.isMongoConnected()) {
-      const memDoc = FallbackStore.kits.get(String(req.params.id));
-      if (!memDoc || memDoc.userId !== req.userId) {
-        res.status(404).json({ error: 'Kit not found or access denied.' });
-        return;
-      }
-      memDoc.kit = kit;
-      memDoc.title = `${kit.role.title} at ${kit.source.company}`;
-      memDoc.company = kit.source.company;
-      memDoc.updatedAt = new Date();
-      res.status(200).json({ message: 'Kit updated successfully', kit: memDoc.kit });
-      return;
-    }
-
-    const kitDoc = await Kit.findOne({ _id: req.params.id, userId: req.userId });
-    if (!kitDoc) {
-      res.status(404).json({ error: 'Kit not found or access denied.' });
-      return;
-    }
-
-    kitDoc.kit = kit;
-    kitDoc.title = `${kit.role.title} at ${kit.source.company}`;
-    kitDoc.company = kit.source.company;
-    await kitDoc.save();
-
-    res.status(200).json({
-      message: 'Kit updated successfully',
-      kit: kitDoc.kit,
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update kit.' });
-  }
-}
-
-export async function deleteKit(
-  req: AuthenticatedRequest,
-  res: Response
-): Promise<void> {
-  try {
-    if (!FallbackStore.isMongoConnected()) {
-      const memDoc = FallbackStore.kits.get(String(req.params.id));
-      if (!memDoc || memDoc.userId !== req.userId) {
-        res.status(404).json({ error: 'Kit not found.' });
-        return;
-      }
-      FallbackStore.kits.delete(String(req.params.id));
-      res.status(200).json({ message: 'Kit deleted successfully.' });
-      return;
-    }
-
-    const deleted = await Kit.findOneAndDelete({ _id: req.params.id, userId: req.userId });
-    if (!deleted) {
-      res.status(404).json({ error: 'Kit not found.' });
-      return;
-    }
-
-    res.status(200).json({ message: 'Kit deleted successfully.' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete kit.' });
-  }
-}
-
-/**
- * Regenerates a single section without losing edits made elsewhere.
- * Preserves questions that are manual, edited, or pinned!
- */
-export async function regenerateSection(
-  req: AuthenticatedRequest,
-  res: Response
-): Promise<void> {
-  try {
-    const { section, category } = req.body; // e.g. section: 'question-category' | 'company_brief' | 'schedule'
-    const kitId = String(req.params.id);
-
-    let kit: PrepKit;
-    let saveKit: (updatedKit: PrepKit) => Promise<void>;
-
-    if (!FallbackStore.isMongoConnected() || kitId.startsWith('mem_')) {
-      const memDoc = FallbackStore.kits.get(kitId);
-      if (!memDoc || (req.userId && memDoc.userId !== req.userId)) {
-        res.status(404).json({ error: 'Kit not found.' });
-        return;
-      }
-      kit = memDoc.kit;
-      saveKit = async (updatedKit: PrepKit) => {
-        memDoc.kit = updatedKit;
-        memDoc.updatedAt = new Date();
-      };
-    } else {
-      const kitDoc = await Kit.findOne({ _id: kitId, userId: req.userId });
-      if (!kitDoc) {
-        res.status(404).json({ error: 'Kit not found.' });
-        return;
-      }
-      kit = kitDoc.kit;
-      saveKit = async (updatedKit: PrepKit) => {
-        kitDoc.kit = updatedKit;
-        kitDoc.markModified('kit');
-        await kitDoc.save();
-      };
-    }
-
-    if (section === 'company_brief') {
-      const briefPrompts = buildCompanyBriefPrompt(
-        kit.source.company,
-        [{ url: kit.source.company_url, title: 'Company Page', content: kit.company_brief.what_they_do, category: 'company' }],
-        'Regenerated corporate research.'
-      );
-
-      const regenerated = await defaultLLMClient.generateJson<{ summary: string; what_they_do: string }>({
-        systemPrompt: briefPrompts.systemPrompt,
-        userPrompt: briefPrompts.userPrompt,
-      });
-
-      kit.company_brief.summary = regenerated.summary || kit.company_brief.summary;
-      kit.company_brief.what_they_do = regenerated.what_they_do || kit.company_brief.what_they_do;
-    } else if (section === 'schedule') {
-      // Re-allocate schedule deterministically with current active questions
-      kit.schedule = allocateSchedule(
-        kit.role.requirements,
-        kit.questions,
-        kit.schedule.days_available
-      );
-    } else if (section === 'question_category' && category) {
-      const targetCategory = category as QuestionCategory;
-
-      // PRESERVATION LOGIC:
-      // Questions to preserve: origin === 'manual' || origin === 'edited' || pinned === true
-      const preservedQuestions = kit.questions.filter((q) => {
-        if (q.category !== targetCategory) return true; // keep other categories untouched
-        return q.origin === 'manual' || q.origin === 'edited' || q.pinned === true;
-      });
-
-      // Find requirements relevant to this category
-      const targetReqs = kit.role.requirements.filter((r) =>
-        targetCategory === 'technical'
-          ? r.kind === 'technical' || r.kind === 'domain'
-          : targetCategory === 'behavioural'
-          ? r.kind === 'behavioural'
-          : true
-      );
-
-      const prompts = buildCategoryQuestionsPrompt(
-        targetCategory,
-        targetReqs.length > 0 ? targetReqs : kit.role.requirements.slice(0, 2),
-        kit.company_brief,
-        '',
-        kit.questions.length + 10
-      );
-
-      const freshResult = await defaultLLMClient.generateJson<{
-        questions: KitQuestion[];
-        flashcards: unknown[];
-      }>({
-        systemPrompt: prompts.systemPrompt,
-        userPrompt: prompts.userPrompt,
-      });
-
-      const newGeneratedQuestions: KitQuestion[] = [];
-      if (Array.isArray(freshResult.questions)) {
-        for (let i = 0; i < freshResult.questions.length; i++) {
-          const fresh = freshResult.questions[i];
-          newGeneratedQuestions.push({
-            id: `q_regen_${Date.now()}_${i + 1}`,
-            requirement_ids: fresh.requirement_ids || [kit.role.requirements[0]?.id || 'r1'],
-            category: targetCategory,
-            prompt: fresh.prompt,
-            answer_outline: fresh.answer_outline,
-            difficulty: Math.max(1, Math.min(3, fresh.difficulty || 2)),
-            origin: 'generated',
-            pinned: false,
-          });
-        }
-      }
-
-      // Merge preserved questions and new questions
-      kit.questions = [...preservedQuestions, ...newGeneratedQuestions];
-
-      // Re-evaluate coverage
-      const coverageAnalysis = checkCoverage(kit.role.requirements, kit.questions, kit.coverage.passes);
-      kit.coverage = coverageAnalysis.coverage;
-
-      // Re-allocate schedule
-      kit.schedule = allocateSchedule(
-        kit.role.requirements,
-        kit.questions,
-        kit.schedule.days_available
-      );
-    }
-
-    await saveKit(kit);
-
-    res.status(200).json({
-      message: `Section "${section}" regenerated successfully while preserving user edits.`,
-      kit,
-    });
-  } catch (err) {
-    console.error('Regenerate section error:', err);
-    res.status(500).json({ error: 'Failed to regenerate section.' });
-  }
-}
-
-export async function batchUpload(
-  req: AuthenticatedRequest,
-  res: Response
-): Promise<void> {
-  try {
-    const { cases } = req.body;
-    if (!Array.isArray(cases) || cases.length === 0) {
-      res.status(400).json({ error: 'Cases array is required.' });
-      return;
-    }
-
-    const createdKits = [];
-    const errors = [];
-
-    for (const c of cases) {
+    if (isDbConnected()) {
       try {
-        const result = await runPrepKitPipeline({
-          jd: c.jd,
-          companyUrl: c.company_url,
-          days: c.days || 5,
-        });
-
-        if (result.success && result.kit) {
-          let kitId: string;
-          const kitTitle = `${result.kit.role.title} at ${result.kit.source.company}`;
-
-          if (!FallbackStore.isMongoConnected()) {
-            const fakeId = `mem_kit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-            FallbackStore.kits.set(fakeId, {
-              _id: fakeId,
-              userId: req.userId || 'anon',
-              title: kitTitle,
-              company: result.kit.source.company,
-              kit: result.kit,
-              status: 'ready',
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            });
-            kitId = fakeId;
-          } else {
-            const doc = await Kit.create({
-              userId: req.userId,
-              title: kitTitle,
-              company: result.kit.source.company,
-              kit: result.kit,
-              status: 'ready',
-            });
-            kitId = doc._id.toString();
-          }
-
-          createdKits.push({ id: kitId, title: kitTitle });
-        } else {
-          errors.push({ company_url: c.company_url, error: result.error });
+        const dbKits = await Kit.find({ userId }).sort({ createdAt: -1 }).lean();
+        if (dbKits && dbKits.length > 0) {
+          res.json({
+            kits: dbKits.map(k => ({
+              id: k._id,
+              role: k.kit.role.title,
+              company: k.kit.source.company,
+              company_url: k.kit.source.company_url,
+              days: k.kit.schedule.days_available,
+              requirementsCount: k.kit.role.requirements.length,
+              questionsCount: k.kit.questions.length,
+              createdAt: k.createdAt instanceof Date ? k.createdAt.toISOString() : k.createdAt,
+              updatedAt: k.updatedAt instanceof Date ? k.updatedAt.toISOString() : k.updatedAt
+            }))
+          });
+          return;
         }
-      } catch (e) {
-        errors.push({ company_url: c.company_url, error: String(e) });
+      } catch (dbErr: any) {
+        console.warn(`[KitController] MongoDB read error: ${dbErr.message}. Falling back.`);
       }
     }
 
-    res.status(200).json({
-      message: `Batch processed: ${createdKits.length} succeeded, ${errors.length} failed.`,
-      createdKits,
-      errors,
+    const kits = fallbackStore.findKitsByUserId(userId);
+    res.json({
+      kits: kits.map(k => ({
+        id: k.id,
+        role: k.kit.role.title,
+        company: k.kit.source.company,
+        company_url: k.kit.source.company_url,
+        days: k.kit.schedule.days_available,
+        requirementsCount: k.kit.role.requirements.length,
+        questionsCount: k.kit.questions.length,
+        createdAt: k.createdAt,
+        updatedAt: k.updatedAt
+      }))
     });
-  } catch (err) {
-    res.status(500).json({ error: 'Batch processing error.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch kits', details: err.message });
+  }
+}
+
+export async function getKitById(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id || 'guest_user';
+
+    let foundKit: { id: string; userId: string; kit: AppendixAKit; createdAt: string; updatedAt: string } | null = null;
+
+    if (isDbConnected()) {
+      try {
+        const dbDoc = await Kit.findById(id).lean() as any;
+        if (dbDoc) {
+          foundKit = {
+            id: dbDoc._id,
+            userId: dbDoc.userId,
+            kit: dbDoc.kit,
+            createdAt: dbDoc.createdAt instanceof Date ? dbDoc.createdAt.toISOString() : dbDoc.createdAt,
+            updatedAt: dbDoc.updatedAt instanceof Date ? dbDoc.updatedAt.toISOString() : dbDoc.updatedAt
+          };
+        }
+      } catch (dbErr: any) {
+        console.warn(`[KitController] MongoDB findById error: ${dbErr.message}`);
+      }
+    }
+
+    if (!foundKit) {
+      const record = fallbackStore.findKitById(id);
+      if (record) {
+        foundKit = {
+          id: record.id,
+          userId: record.userId,
+          kit: record.kit,
+          createdAt: record.createdAt,
+          updatedAt: record.updatedAt
+        };
+      }
+    }
+
+    if (!foundKit) {
+      res.status(404).json({ error: 'Prep kit not found' });
+      return;
+    }
+
+    // Permission check: allow owner or guest session
+    if (foundKit.userId !== userId && foundKit.userId !== 'guest_user' && userId !== 'guest_user') {
+      res.status(403).json({ error: 'Access denied to this prep kit' });
+      return;
+    }
+
+    res.json({
+      id: foundKit.id,
+      kit: foundKit.kit,
+      createdAt: foundKit.createdAt,
+      updatedAt: foundKit.updatedAt
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch kit details', details: err.message });
+  }
+}
+
+export async function updateKit(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { kit } = req.body;
+    const userId = req.user?.id || 'guest_user';
+
+    const now = new Date();
+
+    // Update MongoDB
+    if (isDbConnected()) {
+      try {
+        await Kit.findByIdAndUpdate(id, {
+          $set: { kit, updatedAt: now }
+        });
+      } catch (dbErr: any) {
+        console.warn(`[KitController] MongoDB update error: ${dbErr.message}`);
+      }
+    }
+
+    // Update fallback store
+    const record = fallbackStore.findKitById(id);
+    if (record) {
+      record.kit = kit;
+      record.updatedAt = now.toISOString();
+      fallbackStore.saveKit(record);
+    }
+
+    res.json({
+      message: 'Kit updated successfully',
+      id,
+      kit
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to update kit', details: err.message });
+  }
+}
+
+export async function regenerateSection(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { target } = req.body;
+    const userId = req.user?.id || 'guest_user';
+
+    let currentKit: AppendixAKit | null = null;
+
+    if (isDbConnected()) {
+      const dbDoc = await Kit.findById(id).lean() as any;
+      if (dbDoc) currentKit = dbDoc.kit;
+    }
+
+    if (!currentKit) {
+      const record = fallbackStore.findKitById(id);
+      if (record) currentKit = record.kit;
+    }
+
+    if (!currentKit) {
+      res.status(404).json({ error: 'Prep kit not found' });
+      return;
+    }
+
+    const kit = currentKit;
+
+    if (target === 'schedule') {
+      kit.schedule = allocateSchedule(kit.schedule.days_available, kit.questions, kit.role.requirements);
+    } else if (target === 'brief') {
+      kit.company_brief.summary = `Updated briefing for ${kit.source.company}. Core technical mission and team expectations refreshed.`;
+    } else if (target.startsWith('questions:')) {
+      const category = target.split(':')[1] as any;
+
+      // Section 6 state preservation: keep edited, pinned, and custom questions
+      const preservedQuestions = kit.questions.filter(q =>
+        q.category !== category ||
+        q.origin === 'edited' ||
+        q.origin === 'pinned' ||
+        q.origin === 'custom'
+      );
+
+      const targetReqs = kit.role.requirements.filter(r =>
+        category === 'technical' ? r.kind === 'technical' :
+        category === 'behavioural' ? r.kind === 'behavioural' :
+        category === 'system-design' ? (r.kind === 'technical' || r.kind === 'domain') :
+        true
+      );
+
+      const startIdx = kit.questions.length + 10;
+      const freshQuestions: KitQuestion[] = targetReqs.slice(0, 3).map((req, i) => ({
+        id: `q${startIdx + i}`,
+        requirement_ids: [req.id],
+        category,
+        prompt: `[Regenerated ${category}] Deep dive: explain operational best practices and design choices for "${req.text}".`,
+        answer_outline: `1. Key architectural patterns. 2. Failure modes and resiliency. 3. Code examples.`,
+        difficulty: (req.priority === 'must' ? 3 : 2) as 1 | 2 | 3,
+        origin: 'generated'
+      }));
+
+      kit.questions = [...preservedQuestions, ...freshQuestions];
+
+      const cov = checkRequirementCoverage(kit.role.requirements, kit.questions);
+      kit.coverage.uncovered_requirement_ids = cov.uncoveredRequirementIds;
+      kit.schedule = allocateSchedule(kit.schedule.days_available, kit.questions, kit.role.requirements);
+    } else {
+      res.status(400).json({ error: `Unsupported regeneration target '${target}'` });
+      return;
+    }
+
+    const now = new Date();
+
+    if (isDbConnected()) {
+      await Kit.findByIdAndUpdate(id, { $set: { kit, updatedAt: now } });
+    }
+
+    const rec = fallbackStore.findKitById(id);
+    if (rec) {
+      rec.kit = kit;
+      rec.updatedAt = now.toISOString();
+      fallbackStore.saveKit(rec);
+    }
+
+    res.json({
+      message: `Section '${target}' regenerated successfully`,
+      kit
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to regenerate section', details: err.message });
+  }
+}
+
+export async function deleteKit(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+
+    if (isDbConnected()) {
+      await Kit.findByIdAndDelete(id);
+    }
+
+    fallbackStore.deleteKit(id);
+
+    res.json({ message: 'Kit deleted successfully' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to delete kit', details: err.message });
   }
 }

@@ -1,89 +1,56 @@
-export interface RateLimiterOptions {
-  minIntervalMs?: number; // Minimum time between consecutive calls
-  maxRetries?: number;
-  baseDelayMs?: number;
-}
-
-export class LLMRateLimiter {
-  private lastCallTime: number = 0;
+export class RateLimiter {
   private minIntervalMs: number;
-  private maxRetries: number;
-  private baseDelayMs: number;
-  private queue: Promise<void> = Promise.resolve();
+  private lastCallTime: number = 0;
 
-  constructor(options: RateLimiterOptions = {}) {
-    this.minIntervalMs = options.minIntervalMs ?? 1500;
-    this.maxRetries = options.maxRetries ?? 5;
-    this.baseDelayMs = options.baseDelayMs ?? 2000;
+  constructor(requestsPerMinute: number = 15) {
+    this.minIntervalMs = Math.ceil(60000 / requestsPerMinute);
   }
 
-  private async waitTurn(): Promise<void> {
+  async acquire(): Promise<void> {
     const now = Date.now();
-    const timeSinceLastCall = now - this.lastCallTime;
-    const waitTime = Math.max(0, this.minIntervalMs - timeSinceLastCall);
-
-    if (waitTime > 0) {
-      await new Promise((resolve) => setTimeout(resolve, waitTime));
+    const elapsed = now - this.lastCallTime;
+    if (elapsed < this.minIntervalMs) {
+      const waitTime = this.minIntervalMs - elapsed;
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
     this.lastCallTime = Date.now();
   }
 
-  /**
-   * Schedules a task through the rate-limited queue with exponential backoff and jitter.
-   */
-  async execute<T>(fn: () => Promise<T>): Promise<T> {
-    // Chain onto queue to serialize requests
-    return new Promise<T>((resolve, reject) => {
-      this.queue = this.queue.then(async () => {
-        let attempt = 0;
+  async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 4,
+    initialBackoffMs: number = 1500
+  ): Promise<T> {
+    let attempt = 0;
+    let delay = initialBackoffMs;
 
-        while (true) {
-          try {
-            await this.waitTurn();
-            const result = await fn();
-            resolve(result);
-            return;
-          } catch (err: unknown) {
-            attempt++;
-            const errorMessage = err instanceof Error ? err.message : String(err);
-            const isRateLimit =
-              errorMessage.includes('429') ||
-              errorMessage.includes('RESOURCE_EXHAUSTED') ||
-              errorMessage.includes('rate limit') ||
-              errorMessage.includes('quota') ||
-              errorMessage.includes('slow down');
+    while (attempt <= maxRetries) {
+      try {
+        await this.acquire();
+        return await operation();
+      } catch (err: any) {
+        attempt++;
+        const isRateLimit = err?.status === 429 ||
+          err?.message?.includes('429') ||
+          err?.message?.toLowerCase().includes('quota') ||
+          err?.message?.toLowerCase().includes('rate limit') ||
+          err?.message?.toLowerCase().includes('slow down');
 
-            const isTransient =
-              isRateLimit ||
-              errorMessage.includes('503') ||
-              errorMessage.includes('500') ||
-              errorMessage.includes('ETIMEDOUT') ||
-              errorMessage.includes('ECONNRESET');
-
-            if (attempt <= this.maxRetries && isTransient) {
-              // Exponential backoff with random jitter: (2^attempt * base) + [0..1000]ms
-              const jitter = Math.floor(Math.random() * 1000);
-              const backoffMs =
-                this.baseDelayMs * Math.pow(2, attempt - 1) + jitter;
-
-              console.warn(
-                `[LLMRateLimiter] Rate limit or transient error detected (attempt ${attempt}/${this.maxRetries}). Backing off for ${backoffMs}ms... Error: ${errorMessage.slice(0, 100)}`
-              );
-
-              await new Promise((res) => setTimeout(res, backoffMs));
-            } else {
-              reject(err);
-              return;
-            }
-          }
+        if (attempt > maxRetries || !isRateLimit) {
+          throw err;
         }
-      });
-    });
+
+        // Exponential backoff with random jitter
+        const jitter = Math.floor(Math.random() * 500);
+        const totalWait = delay + jitter;
+        console.warn(`[RateLimiter] Rate limit (429) hit. Backing off for ${totalWait}ms (Attempt ${attempt}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, totalWait));
+        delay *= 2;
+      }
+    }
+
+    throw new Error('Max retries exceeded in rate limiter');
   }
 }
 
-export const defaultRateLimiter = new LLMRateLimiter({
-  minIntervalMs: 1500,
-  maxRetries: 5,
-  baseDelayMs: 2500,
-});
+export const globalLlmRateLimiter = new RateLimiter(12);

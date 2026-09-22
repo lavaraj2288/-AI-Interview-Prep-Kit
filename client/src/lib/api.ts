@@ -1,137 +1,133 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+/**
+ * API client for The AI Interview Prep Kit
+ */
 
-function getAuthHeader(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  const token = localStorage.getItem('trao_prep_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+function getAuthToken(): string | null {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('trao_prep_token');
+  }
+  return null;
 }
 
-export async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
-  const headers = {
+export function setAuthToken(token: string): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('trao_prep_token', token);
+  }
+}
+
+export function clearAuthToken(): void {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('trao_prep_token');
+  }
+}
+
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...getAuthHeader(),
-    ...options.headers,
+    ...(options.headers as Record<string, string> || {})
   };
 
-  const response = await fetch(url, { ...options, headers });
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || `Request failed with status ${response.status}`);
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
-  return data as T;
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    headers
+  });
+
+  if (!res.ok) {
+    let errorMsg = `Request failed with status ${res.status}`;
+    try {
+      const errJson = await res.json();
+      errorMsg = errJson.error || errJson.details || errorMsg;
+    } catch {
+      // ignore json parse error
+    }
+    throw new Error(errorMsg);
+  }
+
+  return res.json();
 }
 
-export const authApi = {
-  login: (email: string, password: string) =>
-    apiRequest<{ token: string; user: { id: string; email: string; name: string } }>('/auth/login', {
+export const api = {
+  // Auth
+  register: (data: { email: string; password: string; name?: string }) =>
+    request<{ token: string; user: any }>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(data)
     }),
-  register: (email: string, password: string, name?: string) =>
-    apiRequest<{ token: string; user: { id: string; email: string; name: string } }>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, password, name }),
-    }),
-  me: () =>
-    apiRequest<{ user: { id: string; email: string; name: string } }>('/auth/me', {
-      method: 'GET',
-    }),
-};
 
-export const kitApi = {
-  list: () =>
-    apiRequest<{
-      kits: Array<{
-        _id: string;
-        title: string;
-        company: string;
-        kit: { coverage: { uncovered_requirement_ids: string[]; passes: number }; schedule: { days_available: number } };
-        createdAt: string;
-      }>;
-    }>('/kits', { method: 'GET' }),
-  get: (id: string) =>
-    apiRequest<{ id: string; title: string; company: string; kit: any }> (`/kits/${id}`, {
-      method: 'GET',
-    }),
-  create: (jd: string, company_url: string, days: number) =>
-    apiRequest<{ message: string; kitId: string; kit: any }>('/kits', {
+  login: (data: { email: string; password: string }) =>
+    request<{ token: string; user: any }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ jd, company_url, days }),
+      body: JSON.stringify(data)
     }),
-  update: (id: string, kit: any) =>
-    apiRequest<{ message: string; kit: any }>(`/kits/${id}`, {
+
+  getMe: () => request<{ user: any }>('/auth/me'),
+
+  // Kits
+  createKit: (data: { jd: string; company_url: string; days: number; company_name?: string }) =>
+    request<{ id: string; kit: any }>('/kits', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+  getKits: () => request<{ kits: any[] }>('/kits'),
+
+  getKitById: (id: string) => request<{ id: string; kit: any; createdAt: string; updatedAt: string }>(`/kits/${id}`),
+
+  updateKit: (id: string, kit: any) =>
+    request<{ message: string; id: string; kit: any }>(`/kits/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ kit }),
+      body: JSON.stringify({ kit })
     }),
-  delete: (id: string) =>
-    apiRequest<{ message: string }>(`/kits/${id}`, {
-      method: 'DELETE',
-    }),
-  regenerateSection: (id: string, section: string, category?: string) =>
-    apiRequest<{ message: string; kit: any }>(`/kits/${id}/regenerate-section`, {
-      method: 'POST',
-      body: JSON.stringify({ section, category }),
-    }),
-  batchUpload: (cases: Array<{ jd: string; company_url: string; days: number }>) =>
-    apiRequest<{ message: string; createdKits: any[]; errors: any[] }>('/kits/batch', {
-      method: 'POST',
-      body: JSON.stringify({ cases }),
-    }),
-};
 
-export const practiceApi = {
-  getSession: (kitId: string) =>
-    apiRequest<{
-      kitTitle: string;
+  regenerateSection: (id: string, target: string) =>
+    request<{ message: string; kit: any }>(`/kits/${id}/regenerate`, {
+      method: 'POST',
+      body: JSON.stringify({ target })
+    }),
+
+  deleteKit: (id: string) =>
+    request<{ message: string }>(`/kits/${id}`, {
+      method: 'DELETE'
+    }),
+
+  // Practice
+  recordReview: (kitId: string, cardId: string, confidence: number) =>
+    request<{ message: string; review: any; totalReviewed: number }>(`/kits/${kitId}/practice/review`, {
+      method: 'POST',
+      body: JSON.stringify({ cardId, confidence })
+    }),
+
+  getPracticeSession: (kitId: string) =>
+    request<{
+      kitId: string;
       totalCards: number;
       coveredCards: number;
-      uncoveredCards: number;
-      progressPercentage: number;
-      orderedCards: Array<{
-        id: string;
-        front: string;
-        back: string;
-        requirement_ids: string[];
-        confidence: number | null;
-        isCovered: boolean;
-        lastReviewedAt: string | null;
-      }>;
-    }>(`/practice/${kitId}`, { method: 'GET' }),
-  recordConfidence: (kitId: string, flashcardId: string, confidence: number) =>
-    apiRequest<{ message: string; flashcardId: string; confidence: number }>(
-      `/practice/${kitId}/confidence`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ flashcardId, confidence }),
-      }
-    ),
-};
+      breakdown: { hard: number; good: number; easy: number; unseen: number };
+      prioritizedCards: any[];
+      reviews: any[];
+    }>(`/kits/${kitId}/practice`),
 
-export const mockInterviewApi = {
-  evaluate: (payload: {
-    questionPrompt: string;
-    answerOutline: string;
-    candidateAnswer: string;
-    category?: string;
-  }) =>
-    apiRequest<{
+  // Creative Feature: Mock Interview Drills
+  evaluateMockAnswer: (kitId: string, questionId: string, userAnswer: string) =>
+    request<{
+      questionId: string;
+      prompt: string;
       evaluation: {
-        overallScore: number;
-        accuracyScore: number;
-        communicationScore: number;
+        score: number;
+        rating: string;
         strengths: string[];
-        improvements: string[];
-        feedback: string;
-        followUpQuestion: string;
+        areas_for_improvement: string[];
+        model_response_tip: string;
       };
-    }>('/mock-interview/evaluate', {
+    }>('/mock/evaluate', {
       method: 'POST',
-      body: JSON.stringify(payload),
-    }),
+      body: JSON.stringify({ kitId, questionId, userAnswer })
+    })
 };

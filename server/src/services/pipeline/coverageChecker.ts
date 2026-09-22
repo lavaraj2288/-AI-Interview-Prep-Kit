@@ -1,65 +1,52 @@
-import { RoleRequirement, KitQuestion, KitCoverage } from '../../types/kit.js';
+import { KitRequirement, KitQuestion } from '../../types/kit.js';
 
 export interface CoverageAnalysis {
-  coverage: KitCoverage;
-  totalRequirements: number;
-  coveredRequirementsCount: number;
-  uncoveredMustRequirements: RoleRequirement[];
-  uncoveredNiceRequirements: RoleRequirement[];
-  hasGaps: boolean;
-  hasMustGaps: boolean;
+  coveredRequirementIds: string[];
+  uncoveredRequirementIds: string[];
+  uncoveredMustHaves: KitRequirement[];
+  uncoveredNiceToHaves: KitRequirement[];
   coverageRatio: number;
 }
 
-/**
- * Deterministically checks which requirements are covered by questions.
- * This is pure application logic, not handed to the LLM.
- */
-export function checkCoverage(
-  requirements: RoleRequirement[],
-  questions: KitQuestion[],
-  previousPasses: number = 0
+export function checkRequirementCoverage(
+  requirements: KitRequirement[],
+  questions: KitQuestion[]
 ): CoverageAnalysis {
-  const coveredSet = new Set<string>();
+  // Collect all requirement IDs referenced across generated questions
+  const coveredIdsSet = new Set<string>();
 
-  for (const q of questions) {
-    if (Array.isArray(q.requirement_ids)) {
-      for (const reqId of q.requirement_ids) {
-        coveredSet.add(reqId);
+  for (const question of questions) {
+    if (Array.isArray(question.requirement_ids)) {
+      for (const reqId of question.requirement_ids) {
+        if (reqId) coveredIdsSet.add(reqId);
       }
     }
   }
 
   const uncoveredRequirementIds: string[] = [];
-  const uncoveredMust: RoleRequirement[] = [];
-  const uncoveredNice: RoleRequirement[] = [];
+  const uncoveredMustHaves: KitRequirement[] = [];
+  const uncoveredNiceToHaves: KitRequirement[] = [];
 
   for (const req of requirements) {
-    if (!coveredSet.has(req.id)) {
+    if (!coveredIdsSet.has(req.id)) {
       uncoveredRequirementIds.push(req.id);
       if (req.priority === 'must') {
-        uncoveredMust.push(req);
+        uncoveredMustHaves.push(req);
       } else {
-        uncoveredNice.push(req);
+        uncoveredNiceToHaves.push(req);
       }
     }
   }
 
-  const totalRequirements = requirements.length;
-  const coveredCount = totalRequirements - uncoveredRequirementIds.length;
-  const coverageRatio = totalRequirements > 0 ? coveredCount / totalRequirements : 1.0;
+  const totalReqs = requirements.length;
+  const coveredCount = totalReqs - uncoveredRequirementIds.length;
+  const coverageRatio = totalReqs > 0 ? coveredCount / totalReqs : 1.0;
 
   return {
-    coverage: {
-      uncovered_requirement_ids: uncoveredRequirementIds,
-      passes: previousPasses + 1,
-    },
-    totalRequirements,
-    coveredRequirementsCount: coveredCount,
-    uncoveredMustRequirements: uncoveredMust,
-    uncoveredNiceRequirements: uncoveredNice,
-    hasGaps: uncoveredRequirementIds.length > 0,
-    hasMustGaps: uncoveredMust.length > 0,
-    coverageRatio,
+    coveredRequirementIds: Array.from(coveredIdsSet),
+    uncoveredRequirementIds,
+    uncoveredMustHaves,
+    uncoveredNiceToHaves,
+    coverageRatio
   };
 }

@@ -1,654 +1,607 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { kitApi } from '@/lib/api';
-import MockInterviewModal from '@/components/MockInterviewModal';
-import PrintCheatsheetModal from '@/components/PrintCheatsheetModal';
+import { api } from '../../../lib/api';
+import { MockInterviewModal } from '../../../components/MockInterviewModal';
+import { PrintCheatsheetModal } from '../../../components/PrintCheatsheetModal';
+import {
+  Save, RotateCcw, Pin, PinOff, Plus, Trash2, BookOpen, Bot, Printer,
+  CheckCircle, AlertCircle, ArrowUpDown, ChevronRight, Sparkles, Building2,
+  Calendar, Layers, Clock, ShieldCheck, Tag
+} from 'lucide-react';
 
 export default function KitBuilderPage() {
-  const { id } = useParams();
-  const router = useRouter();
-  const kitId = id as string;
-
-  const [kit, setKit] = useState<any | null>(null);
+  const { id } = useParams<{ id: string }>();
+  const [kit, setKit] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [regenLoading, setRegenLoading] = useState<string | null>(null);
-
-  // Tabs for question categories
-  const [activeCategory, setActiveCategory] = useState<string>('all');
-
-  // Modals
-  const [mockQuestion, setMockQuestion] = useState<any | null>(null);
-  const [isMockModalOpen, setIsMockModalOpen] = useState(false);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string>('technical');
+  const [showMockModal, setShowMockModal] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [feedbackMsg, setFeedbackMsg] = useState('');
 
   useEffect(() => {
-    loadKit();
-  }, [kitId]);
-
-  const loadKit = async () => {
-    setLoading(true);
-    try {
-      const res = await kitApi.get(kitId);
-      setKit(res.kit);
-    } catch (err) {
-      console.error('Failed to load kit:', err);
-    } finally {
-      setLoading(false);
+    if (id) {
+      api.getKitById(id)
+        .then(res => setKit(res.kit))
+        .catch(() => setKit(null))
+        .finally(() => setLoading(false));
     }
+  }, [id]);
+
+  const showNotification = (msg: string) => {
+    setFeedbackMsg(msg);
+    setTimeout(() => setFeedbackMsg(''), 3000);
   };
 
-  const handleSaveKit = async () => {
-    if (!kit) return;
+  const handleSave = async () => {
+    if (!kit || !id) return;
     setSaving(true);
-    setSaveSuccess(false);
     try {
-      await kitApi.update(kitId, kit);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2500);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to save kit changes');
+      await api.updateKit(id, kit);
+      showNotification('All edits saved successfully!');
+    } catch (err: any) {
+      alert(err.message || 'Failed to save kit');
     } finally {
       setSaving(false);
     }
   };
 
-  // Section Regeneration
-  const handleRegenerate = async (section: string, category?: string) => {
-    const key = category ? `${section}:${category}` : section;
-    if (
-      !confirm(
-        `Regenerate ${category || section}? Questions you edited or wrote by hand, as well as pinned questions, will be preserved.`
-      )
-    ) {
-      return;
-    }
-
-    setRegenLoading(key);
+  // Section 6: Regenerate section while preserving pinned and edited state
+  const handleRegenerate = async (target: string) => {
+    if (!id) return;
+    setRegeneratingSection(target);
     try {
-      const res = await kitApi.regenerateSection(kitId, section, category);
+      const res = await api.regenerateSection(id, target);
       setKit(res.kit);
-    } catch (err) {
-      alert('Failed to regenerate section');
+      showNotification(`Section '${target}' regenerated! Preserved edited and pinned items.`);
+    } catch (err: any) {
+      alert(err.message || 'Failed to regenerate section');
     } finally {
-      setRegenLoading(null);
+      setRegeneratingSection(null);
     }
   };
 
-  // Inline Question Updates
-  const updateQuestion = (qId: string, updates: Partial<any>) => {
-    if (!kit) return;
-    const updatedQuestions = kit.questions.map((q: any) => {
-      if (q.id === qId) {
-        return {
-          ...q,
-          ...updates,
-          origin: q.origin === 'manual' ? 'manual' : 'edited', // Mark as edited so it survives regeneration!
-        };
-      }
-      return q;
-    });
-    setKit({ ...kit, questions: updatedQuestions });
-  };
-
-  const togglePinQuestion = (qId: string) => {
-    if (!kit) return;
-    const updated = kit.questions.map((q: any) =>
-      q.id === qId ? { ...q, pinned: !q.pinned } : q
-    );
-    setKit({ ...kit, questions: updated });
-  };
-
-  const deleteQuestion = (qId: string) => {
-    if (!kit) return;
-    setKit({
-      ...kit,
-      questions: kit.questions.filter((q: any) => q.id !== qId),
-      // Also remove from schedule if present
-      schedule: {
-        ...kit.schedule,
-        days: kit.schedule.days.map((d: any) => ({
-          ...d,
-          question_ids: d.question_ids.filter((id: string) => id !== qId),
-        })),
-      },
+  // Edit question inline & mark state as 'edited'
+  const handleUpdateQuestion = (qId: string, field: string, value: any) => {
+    setKit((prev: any) => {
+      const updatedQuestions = prev.questions.map((q: any) => {
+        if (q.id === qId) {
+          return {
+            ...q,
+            [field]: value,
+            origin: q.origin === 'pinned' ? 'pinned' : 'edited'
+          };
+        }
+        return q;
+      });
+      return { ...prev, questions: updatedQuestions };
     });
   };
 
-  const addManualQuestion = () => {
-    if (!kit) return;
-    const newId = `q_manual_${Date.now()}`;
+  // Move question across categories
+  const handleMoveQuestionCategory = (qId: string, newCat: string) => {
+    setKit((prev: any) => {
+      const updatedQuestions = prev.questions.map((q: any) => {
+        if (q.id === qId) {
+          return { ...q, category: newCat, origin: 'edited' };
+        }
+        return q;
+      });
+      return { ...prev, questions: updatedQuestions };
+    });
+  };
+
+  // Toggle pin
+  const handleTogglePin = (qId: string) => {
+    setKit((prev: any) => {
+      const updatedQuestions = prev.questions.map((q: any) => {
+        if (q.id === qId) {
+          const nextOrigin = q.origin === 'pinned' ? 'edited' : 'pinned';
+          return { ...q, origin: nextOrigin };
+        }
+        return q;
+      });
+      return { ...prev, questions: updatedQuestions };
+    });
+  };
+
+  // Add question by hand
+  const handleAddQuestion = () => {
+    const newId = `q_custom_${Date.now()}`;
     const newQ = {
       id: newId,
       requirement_ids: [kit.role.requirements[0]?.id || 'r1'],
-      category: activeCategory === 'all' ? 'technical' : activeCategory,
-      prompt: 'New Interview Question Prompt...',
-      answer_outline: 'Outline the core points of a high-quality answer here...',
+      category: activeCategory,
+      prompt: 'New custom interview question (click to edit)',
+      answer_outline: 'Custom answer outline and key points...',
       difficulty: 2,
-      origin: 'manual', // Manual origin survives any regeneration
-      pinned: true,
+      origin: 'custom'
     };
-    setKit({
-      ...kit,
-      questions: [newQ, ...kit.questions],
-    });
+
+    setKit((prev: any) => ({
+      ...prev,
+      questions: [...prev.questions, newQ]
+    }));
   };
 
-  const moveQuestion = (qIndex: number, direction: 'up' | 'down') => {
-    if (!kit) return;
-    const newQuestions = [...kit.questions];
-    const targetIndex = direction === 'up' ? qIndex - 1 : qIndex + 1;
-    if (targetIndex < 0 || targetIndex >= newQuestions.length) return;
-
-    const temp = newQuestions[qIndex];
-    newQuestions[qIndex] = newQuestions[targetIndex];
-    newQuestions[targetIndex] = temp;
-
-    setKit({ ...kit, questions: newQuestions });
+  // Delete question
+  const handleDeleteQuestion = (qId: string) => {
+    setKit((prev: any) => ({
+      ...prev,
+      questions: prev.questions.filter((q: any) => q.id !== qId)
+    }));
   };
 
-  // Flashcard updates
-  const updateFlashcard = (fId: string, updates: Partial<any>) => {
-    if (!kit) return;
-    const updated = kit.flashcards.map((f: any) =>
-      f.id === fId ? { ...f, ...updates, origin: 'edited' } : f
-    );
-    setKit({ ...kit, flashcards: updated });
+  // Flashcards: add/delete/update
+  const handleUpdateFlashcard = (fId: string, field: 'front' | 'back', val: string) => {
+    setKit((prev: any) => ({
+      ...prev,
+      flashcards: prev.flashcards.map((f: any) => f.id === fId ? { ...f, [field]: val, origin: 'edited' } : f)
+    }));
   };
 
-  const addFlashcard = () => {
-    if (!kit) return;
+  const handleAddFlashcard = () => {
     const newF = {
-      id: `f_manual_${Date.now()}`,
-      front: 'New concept or question...',
-      back: 'Explanation or key takeaway...',
+      id: `f_custom_${Date.now()}`,
+      front: 'New Flashcard Concept (click to edit)',
+      back: 'Answer / explanation on reverse side...',
       requirement_ids: [kit.role.requirements[0]?.id || 'r1'],
-      origin: 'manual',
+      origin: 'custom'
     };
-    setKit({ ...kit, flashcards: [newF, ...kit.flashcards] });
+    setKit((prev: any) => ({
+      ...prev,
+      flashcards: [...prev.flashcards, newF]
+    }));
   };
 
-  const deleteFlashcard = (fId: string) => {
-    if (!kit) return;
-    setKit({
-      ...kit,
-      flashcards: kit.flashcards.filter((f: any) => f.id !== fId),
-    });
+  const handleDeleteFlashcard = (fId: string) => {
+    setKit((prev: any) => ({
+      ...prev,
+      flashcards: prev.flashcards.filter((f: any) => f.id !== fId)
+    }));
   };
 
   if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-12 text-slate-500 text-sm">
-        Loading Kit Builder...
-      </div>
-    );
+    return <div className="py-20 text-center text-slate-400">Loading Kit Builder...</div>;
   }
 
   if (!kit) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-        <h2 className="text-xl font-bold text-slate-800 mb-2">Prep Kit Not Found</h2>
-        <Link href="/dashboard" className="text-blue-600 font-semibold hover:underline">
-          Return to Dashboard
-        </Link>
+      <div className="text-center py-20">
+        <h2 className="text-xl font-bold text-white">Kit not found</h2>
+        <Link href="/dashboard" className="text-emerald-400 hover:underline mt-2 inline-block">Return to Dashboard</Link>
       </div>
     );
   }
 
-  const filteredQuestions =
-    activeCategory === 'all'
-      ? kit.questions
-      : kit.questions.filter((q: any) => q.category === activeCategory);
+  const categoryQuestions = kit.questions.filter((q: any) => q.category === activeCategory);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+    <div className="space-y-8 pb-16">
       {/* Top Banner & Actions */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-6">
         <div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
-              {kit.role.seniority}
-            </span>
-            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-              ✓ Coverage Passed (Pass {kit.coverage.passes})
-            </span>
+          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">
+            <Building2 className="w-3.5 h-3.5" />
+            <span>{kit.source.company} • Horizon: {kit.schedule.days_available} Days</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
             {kit.role.title}
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Target Company:{' '}
-            <a
-              href={kit.source.company_url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-blue-600 hover:underline font-medium"
-            >
-              {kit.source.company} ↗
-            </a>{' '}
-            • {kit.schedule.days_available}-Day Schedule Plan
+          <p className="text-xs text-slate-400 mt-1">
+            Researched at {new Date(kit.source.researched_at).toLocaleDateString()} • {kit.source.pages_used?.length || 1} pages crawled
           </p>
         </div>
 
-        {/* Builder Toolbar */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <Link
-            href={`/practice/${kitId}`}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-sm transition flex items-center gap-1.5"
-          >
-            <span>🃏</span> Practice Flashcards
-          </Link>
           <button
-            onClick={() => setIsPrintModalOpen(true)}
-            className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm rounded-xl border border-slate-300 shadow-sm transition flex items-center gap-1.5"
+            onClick={() => setShowMockModal(true)}
+            className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow"
           >
-            <span>📄</span> Cheatsheet / Print
+            <Bot className="w-4 h-4" />
+            AI Mock Drill
           </button>
-          <button
-            onClick={handleSaveKit}
-            disabled={saving}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-sm transition disabled:opacity-50 flex items-center gap-1.5"
+
+          <Link
+            href={`/practice/${id}`}
+            className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition shadow"
           >
-            {saving ? 'Saving...' : saveSuccess ? '✓ Saved!' : '💾 Save Changes'}
+            <BookOpen className="w-4 h-4" />
+            Practice Mode
+          </Link>
+
+          <button
+            onClick={() => setShowPrintModal(true)}
+            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-700 transition"
+          >
+            <Printer className="w-4 h-4" />
+            Cheatsheet
+          </button>
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded-xl transition shadow"
+          >
+            <Save className="w-4 h-4" />
+            {saving ? 'Saving...' : 'Save Kit'}
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Brief & Role & Schedule (4 cols) */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* Company Brief Card */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <span>🏢</span> Company Brief
-              </h2>
-              <button
-                onClick={() => handleRegenerate('company_brief')}
-                disabled={regenLoading === 'company_brief'}
-                className="text-[11px] text-blue-600 hover:text-blue-800 font-medium"
-              >
-                {regenLoading === 'company_brief' ? 'Regenerating...' : 'Regenerate Brief'}
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Summary
-                </label>
-                <textarea
-                  rows={3}
-                  value={kit.company_brief.summary}
-                  onChange={(e) =>
-                    setKit({
-                      ...kit,
-                      company_brief: { ...kit.company_brief, summary: e.target.value },
-                    })
-                  }
-                  className="w-full text-xs text-slate-700 p-2 bg-slate-50 rounded-lg border border-slate-200 leading-relaxed focus:bg-white"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  What They Do & Engineering Culture
-                </label>
-                <textarea
-                  rows={3}
-                  value={kit.company_brief.what_they_do}
-                  onChange={(e) =>
-                    setKit({
-                      ...kit,
-                      company_brief: { ...kit.company_brief, what_they_do: e.target.value },
-                    })
-                  }
-                  className="w-full text-xs text-slate-700 p-2 bg-slate-50 rounded-lg border border-slate-200 leading-relaxed focus:bg-white"
-                />
-              </div>
-              <div className="text-[10px] text-slate-400">
-                Sources: {kit.company_brief.sources?.length || 0} page(s) crawled
-              </div>
-            </div>
-          </div>
+      {feedbackMsg && (
+        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+          <CheckCircle className="w-4 h-4" />
+          <span>{feedbackMsg}</span>
+        </div>
+      )}
 
-          {/* Role Requirements Card */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <h2 className="font-bold text-slate-900 text-sm mb-3 flex items-center gap-2">
-              <span>🎯</span> Extracted Requirements ({kit.role.requirements.length})
-            </h2>
-            <div className="space-y-2">
-              {kit.role.requirements.map((r: any) => (
-                <div
-                  key={r.id}
-                  className={`p-2.5 rounded-xl border text-xs leading-snug flex items-start gap-2 ${
-                    r.priority === 'must'
-                      ? 'bg-amber-50/60 border-amber-200 text-slate-800'
-                      : 'bg-slate-50 border-slate-200 text-slate-700'
-                  }`}
-                >
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase shrink-0 ${
-                      r.priority === 'must'
-                        ? 'bg-amber-200 text-amber-900'
-                        : 'bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    {r.priority}
-                  </span>
-                  <span className="font-mono text-[10px] text-slate-400 shrink-0">
-                    {r.id}
-                  </span>
-                  <span className="flex-1">{r.text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Schedule Summary Card */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <span>📅</span> {kit.schedule.days_available}-Day Schedule
-              </h2>
-              <button
-                onClick={() => handleRegenerate('schedule')}
-                disabled={regenLoading === 'schedule'}
-                className="text-[11px] text-blue-600 hover:text-blue-800 font-medium"
-              >
-                {regenLoading === 'schedule' ? 'Recalculating...' : 'Recalculate Schedule'}
-              </button>
-            </div>
-            <div className="space-y-2">
-              {kit.schedule.days.map((day: any) => (
-                <div
-                  key={day.day}
-                  className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs flex justify-between items-center"
-                >
-                  <div>
-                    <span className="font-bold text-slate-800 mr-2">Day {day.day}:</span>
-                    <span className="text-slate-600">{day.focus}</span>
-                  </div>
-                  <span className="font-semibold text-slate-500 text-[11px] bg-white px-2 py-0.5 rounded border border-slate-200 shrink-0 ml-2">
-                    {day.minutes} min
-                  </span>
-                </div>
-              ))}
-            </div>
+      {/* Coverage Status Bar */}
+      <div className="p-4 rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+          <div>
+            <span className="font-semibold text-white">Coverage Engine Verification: </span>
+            <span className="text-slate-300">
+              {kit.coverage.passes} pass(es) executed.
+              {kit.coverage.uncovered_requirement_ids.length === 0 ? (
+                <span className="text-emerald-400 ml-1">100% of must-have requirements mapped to interview questions.</span>
+              ) : (
+                <span className="text-amber-400 ml-1">
+                  Uncovered requirement IDs: {kit.coverage.uncovered_requirement_ids.join(', ')}
+                </span>
+              )}
+            </span>
           </div>
         </div>
 
-        {/* Right Column: Question Bank & Flashcards (8 cols) */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Question Bank Header & Controls */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
-              <div>
-                <h2 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                  <span>❓</span> Categorized Question Bank ({filteredQuestions.length})
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Reorder, edit inline, move categories, or drill with the mock simulator.
-                </p>
-              </div>
+        <button
+          onClick={() => handleRegenerate('schedule')}
+          disabled={regeneratingSection === 'schedule'}
+          className="flex items-center gap-1 text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition"
+        >
+          <RotateCcw className={`w-3.5 h-3.5 ${regeneratingSection === 'schedule' ? 'animate-spin' : ''}`} />
+          <span>Recalculate Schedule</span>
+        </button>
+      </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={addManualQuestion}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition"
-                >
-                  + Add Question
-                </button>
-                {activeCategory !== 'all' && (
-                  <button
-                    onClick={() => handleRegenerate('question_category', activeCategory)}
-                    disabled={regenLoading === `question_category:${activeCategory}`}
-                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs rounded-lg transition border border-blue-200"
-                  >
-                    {regenLoading === `question_category:${activeCategory}`
-                      ? 'Regenerating...'
-                      : `Regenerate ${activeCategory}`}
-                  </button>
-                )}
-              </div>
-            </div>
+      {/* Section 1: Company Brief */}
+      <section className="p-6 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-emerald-400" />
+            Company Intelligence & Brief
+          </h2>
+          <button
+            onClick={() => handleRegenerate('brief')}
+            disabled={regeneratingSection === 'brief'}
+            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${regeneratingSection === 'brief' ? 'animate-spin' : ''}`} />
+            <span>Regenerate Brief</span>
+          </button>
+        </div>
 
-            {/* Category Filter Tabs */}
-            <div className="flex flex-wrap gap-1.5 pt-4">
-              {['all', 'technical', 'behavioural', 'system-design', 'company-fit'].map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition ${
-                    activeCategory === cat
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {cat.replace('-', ' ')}
-                </button>
-              ))}
-            </div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+              Summary (Inline Editable)
+            </label>
+            <textarea
+              rows={2}
+              value={kit.company_brief.summary}
+              onChange={e => setKit({ ...kit, company_brief: { ...kit.company_brief, summary: e.target.value } })}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+            />
           </div>
 
-          {/* Question List */}
-          <div className="space-y-4">
-            {filteredQuestions.map((q: any, idx: number) => {
-              const realIndex = kit.questions.findIndex((item: any) => item.id === q.id);
-              const isPinned = q.pinned;
-              const isEdited = q.origin === 'edited' || q.origin === 'manual';
+          <div>
+            <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+              What They Do & Hiring Culture (Inline Editable)
+            </label>
+            <textarea
+              rows={3}
+              value={kit.company_brief.what_they_do}
+              onChange={e => setKit({ ...kit, company_brief: { ...kit.company_brief, what_they_do: e.target.value } })}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+        </div>
+      </section>
 
-              return (
-                <div
-                  key={q.id}
-                  className={`bg-white p-5 rounded-2xl border shadow-sm transition ${
-                    isPinned ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200'
-                  }`}
-                >
-                  {/* Question Card Header */}
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-400 font-mono">Q{idx + 1}</span>
-                      <select
-                        value={q.category}
-                        onChange={(e) => updateQuestion(q.id, { category: e.target.value })}
-                        className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="technical">Technical</option>
-                        <option value="behavioural">Behavioural</option>
-                        <option value="system-design">System Design</option>
-                        <option value="company-fit">Company Fit</option>
-                      </select>
+      {/* Section 2: Role & Requirements */}
+      <section className="p-6 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-4">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <Tag className="w-5 h-5 text-emerald-400" />
+          Extracted Role & Requirements
+        </h2>
 
-                      {/* Origin badges */}
-                      {isEdited && (
-                        <span className="text-[10px] px-2 py-0.5 bg-amber-50 text-amber-800 font-bold rounded-full border border-amber-200">
-                          {q.origin === 'manual' ? 'Handwritten' : 'Edited (Protected)'}
-                        </span>
-                      )}
-                    </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {kit.role.requirements.map((req: any) => (
+            <div key={req.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-mono font-bold text-emerald-400">[{req.id}]</span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                    req.priority === 'must' ? 'bg-red-500/20 text-red-300' : 'bg-blue-500/20 text-blue-300'
+                  }`}>
+                    {req.priority}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] uppercase">
+                    {req.kind}
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-slate-200">{req.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-                    <div className="flex items-center gap-1.5">
-                      {/* Difficulty Selector */}
-                      <span className="text-[11px] text-slate-400">Diff:</span>
-                      <select
-                        value={q.difficulty}
-                        onChange={(e) =>
-                          updateQuestion(q.id, { difficulty: parseInt(e.target.value, 10) })
-                        }
-                        className="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-800 border-none"
-                      >
-                        <option value={1}>1 (Junior)</option>
-                        <option value={2}>2 (Mid)</option>
-                        <option value={3}>3 (Senior)</option>
-                      </select>
+      {/* Section 3: Question Bank & The Builder */}
+      <section className="p-6 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <Layers className="w-5 h-5 text-emerald-400" />
+              Categorized Question Bank (The Builder)
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Inline edit prompts and outlines, move questions between categories, and regenerate individual sections while preserving edited/pinned cards.
+            </p>
+          </div>
 
-                      {/* Pin Button */}
-                      <button
-                        onClick={() => togglePinQuestion(q.id)}
-                        title={isPinned ? 'Unpin question' : 'Pin to preserve from regeneration'}
-                        className={`p-1.5 rounded text-xs ${
-                          isPinned ? 'text-blue-600 bg-blue-50 font-bold' : 'text-slate-400 hover:text-slate-600'
-                        }`}
-                      >
-                        📌 {isPinned ? 'Pinned' : 'Pin'}
-                      </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleAddQuestion}
+              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 transition"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Question
+            </button>
 
-                      {/* Reorder Buttons */}
-                      <button
-                        onClick={() => moveQuestion(realIndex, 'up')}
-                        disabled={realIndex === 0}
-                        className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30"
-                      >
-                        ▲
-                      </button>
-                      <button
-                        onClick={() => moveQuestion(realIndex, 'down')}
-                        disabled={realIndex === kit.questions.length - 1}
-                        className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30"
-                      >
-                        ▼
-                      </button>
+            <button
+              onClick={() => handleRegenerate(`questions:${activeCategory}`)}
+              disabled={regeneratingSection === `questions:${activeCategory}`}
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${regeneratingSection === `questions:${activeCategory}` ? 'animate-spin' : ''}`} />
+              <span>Regenerate {activeCategory}</span>
+            </button>
+          </div>
+        </div>
 
-                      {/* Delete */}
-                      <button
-                        onClick={() => deleteQuestion(q.id)}
-                        className="p-1 text-red-400 hover:text-red-600 ml-1"
-                      >
-                        ✕
-                      </button>
-                    </div>
+        {/* Category Tabs */}
+        <div className="flex flex-wrap gap-2">
+          {(['technical', 'system-design', 'behavioural', 'company-fit'] as const).map(cat => {
+            const count = kit.questions.filter((q: any) => q.category === cat).length;
+            return (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition flex items-center gap-2 ${
+                  activeCategory === cat
+                    ? 'bg-emerald-600 text-white shadow'
+                    : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                <span>{cat}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-900/60">
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Question Cards List */}
+        <div className="space-y-4">
+          {categoryQuestions.length === 0 ? (
+            <div className="text-center py-12 border border-dashed border-slate-800 rounded-xl text-xs text-slate-500">
+              No questions currently in this category. Click &quot;Add Question&quot; or &quot;Regenerate {activeCategory}&quot;.
+            </div>
+          ) : (
+            categoryQuestions.map((q: any) => (
+              <div
+                key={q.id}
+                className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-3 relative group"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-emerald-400">[{q.id}]</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-semibold">
+                      Diff: {q.difficulty}/3
+                    </span>
+                    <span className="text-slate-400 text-[10px]">
+                      Covers: {q.requirement_ids?.join(', ') || 'r1'}
+                    </span>
+                    {q.origin && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
+                        q.origin === 'pinned' ? 'bg-amber-500/20 text-amber-300' :
+                        q.origin === 'edited' ? 'bg-indigo-500/20 text-indigo-300' :
+                        q.origin === 'custom' ? 'bg-teal-500/20 text-teal-300' :
+                        'bg-slate-800 text-slate-400'
+                      }`}>
+                        {q.origin}
+                      </span>
+                    )}
                   </div>
 
-                  {/* Question Prompt Editor */}
-                  <div className="py-3">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Prompt
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={q.prompt}
-                      onChange={(e) => updateQuestion(q.id, { prompt: e.target.value })}
-                      className="w-full text-sm font-semibold text-slate-900 p-2 bg-slate-50/50 hover:bg-slate-50 rounded-lg border border-slate-200 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  {/* Answer Outline Editor */}
-                  <div className="pb-3">
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                      Answer Outline & Benchmark Points
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={q.answer_outline}
-                      onChange={(e) => updateQuestion(q.id, { answer_outline: e.target.value })}
-                      className="w-full text-xs text-slate-700 p-2 bg-slate-50/50 hover:bg-slate-50 rounded-lg border border-slate-200 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed"
-                    />
-                  </div>
-
-                  {/* Question Footer: Mapped Requirement & Mock Drill Trigger */}
-                  <div className="flex flex-wrap items-center justify-between pt-2 border-t border-slate-100 text-xs gap-2">
-                    <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                      <span>Covers:</span>
-                      {q.requirement_ids?.map((rid: string) => (
-                        <span
-                          key={rid}
-                          className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-mono text-slate-600"
-                        >
-                          {rid}
-                        </span>
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        setMockQuestion(q);
-                        setIsMockModalOpen(true);
-                      }}
-                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-semibold text-xs flex items-center gap-1 transition"
+                  <div className="flex items-center gap-2">
+                    {/* Move to another category */}
+                    <select
+                      value={q.category}
+                      onChange={e => handleMoveQuestionCategory(q.id, e.target.value)}
+                      className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[11px] text-slate-300 focus:outline-none"
                     >
-                      <span>🎙️</span> Practice Mock Drill
+                      <option value="technical">Technical</option>
+                      <option value="system-design">System Design</option>
+                      <option value="behavioural">Behavioural</option>
+                      <option value="company-fit">Company Fit</option>
+                    </select>
+
+                    {/* Pin button */}
+                    <button
+                      onClick={() => handleTogglePin(q.id)}
+                      className={`p-1.5 rounded hover:bg-slate-800 transition ${
+                        q.origin === 'pinned' ? 'text-amber-400' : 'text-slate-500'
+                      }`}
+                      title={q.origin === 'pinned' ? 'Pinned (survives regeneration)' : 'Pin question'}
+                    >
+                      {q.origin === 'pinned' ? <Pin className="w-3.5 h-3.5" /> : <PinOff className="w-3.5 h-3.5" />}
+                    </button>
+
+                    {/* Delete button */}
+                    <button
+                      onClick={() => handleDeleteQuestion(q.id)}
+                      className="p-1.5 text-slate-500 hover:text-red-400 rounded hover:bg-slate-800 transition"
+                      title="Delete question"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
-              );
-            })}
+
+                {/* Inline editable prompt */}
+                <div>
+                  <textarea
+                    rows={2}
+                    value={q.prompt}
+                    onChange={e => handleUpdateQuestion(q.id, 'prompt', e.target.value)}
+                    className="w-full bg-slate-900/60 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Inline editable answer outline */}
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                    Answer Outline / Assessment Criteria
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={q.answer_outline}
+                    onChange={e => handleUpdateQuestion(q.id, 'answer_outline', e.target.value)}
+                    className="w-full bg-slate-900/40 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* Section 4: Day-by-Day Arithmetic Schedule */}
+      <section className="p-6 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-emerald-400" />
+            Day-by-Day Study Schedule ({kit.schedule.days_available} Days)
+          </h2>
+          <span className="text-xs text-slate-400">Pure Arithmetic Distribution</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {kit.schedule.days.map((day: any) => (
+            <div key={day.day} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-emerald-400">Day {day.day}</span>
+                <span className="flex items-center gap-1 text-slate-400">
+                  <Clock className="w-3 h-3" />
+                  {day.minutes} mins
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-white">{day.focus}</p>
+              <div className="pt-2 border-t border-slate-800/80">
+                <span className="text-[10px] text-slate-500 block mb-1">Assigned Questions:</span>
+                <div className="flex flex-wrap gap-1">
+                  {day.question_ids.map((qId: string) => (
+                    <span key={qId} className="px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 text-[10px] border border-slate-800 font-mono">
+                      {qId}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Section 5: Flashcards Preview */}
+      <section className="p-6 rounded-2xl border border-slate-800 bg-slate-900/40 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-emerald-400" />
+              Flashcards Deck ({kit.flashcards.length} Cards)
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">Inline editable card deck for rapid concept drills.</p>
           </div>
 
-          {/* Flashcard Manager */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h2 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                  <span>🃏</span> Flashcard Deck ({kit.flashcards.length})
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Quick recall cards used in Practice Mode with spaced repetition.
-                </p>
-              </div>
-              <button
-                onClick={addFlashcard}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition"
-              >
-                + Add Card
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {kit.flashcards.map((f: any) => (
-                <div
-                  key={f.id}
-                  className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2 relative"
-                >
-                  <button
-                    onClick={() => deleteFlashcard(f.id)}
-                    className="absolute top-2 right-2 text-slate-400 hover:text-red-500 text-xs"
-                  >
-                    ✕
-                  </button>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase">
-                      Front
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={f.front}
-                      onChange={(e) => updateFlashcard(f.id, { front: e.target.value })}
-                      className="w-full text-xs font-semibold p-1.5 bg-white rounded border border-slate-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase">
-                      Back
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={f.back}
-                      onChange={(e) => updateFlashcard(f.id, { back: e.target.value })}
-                      className="w-full text-xs text-slate-600 p-1.5 bg-white rounded border border-slate-200"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleAddFlashcard}
+              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 transition"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Card
+            </button>
+            <Link
+              href={`/practice/${id}`}
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3.5 py-1.5 rounded-lg transition"
+            >
+              Launch Practice Mode
+            </Link>
           </div>
         </div>
-      </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {kit.flashcards.map((f: any) => (
+            <div key={f.id} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2 relative">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-mono text-emerald-400 font-bold">[{f.id}]</span>
+                <button
+                  onClick={() => handleDeleteFlashcard(f.id)}
+                  className="text-slate-500 hover:text-red-400 p-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <input
+                type="text"
+                value={f.front}
+                onChange={e => handleUpdateFlashcard(f.id, 'front', e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+              />
+              <textarea
+                rows={2}
+                value={f.back}
+                onChange={e => handleUpdateFlashcard(f.id, 'back', e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Modals */}
-      <MockInterviewModal
-        isOpen={isMockModalOpen}
-        onClose={() => setIsMockModalOpen(false)}
-        question={mockQuestion}
-      />
+      {showMockModal && (
+        <MockInterviewModal
+          kitId={id}
+          questions={kit.questions}
+          onClose={() => setShowMockModal(false)}
+        />
+      )}
 
-      <PrintCheatsheetModal
-        isOpen={isPrintModalOpen}
-        onClose={() => setIsPrintModalOpen(false)}
-        kit={kit}
-      />
+      {showPrintModal && (
+        <PrintCheatsheetModal
+          kit={kit}
+          onClose={() => setShowPrintModal(false)}
+        />
+      )}
     </div>
   );
 }

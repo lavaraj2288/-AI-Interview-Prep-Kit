@@ -1,47 +1,22 @@
-import mongoose, { Schema, Document } from 'mongoose';
-import { PrepKit } from '../types/kit.js';
+import mongoose, { Schema } from 'mongoose';
+import { AppendixAKit } from '../types/kit.js';
 
-export interface IKitDocument extends Document {
-  userId: mongoose.Types.ObjectId;
-  title: string;
-  company: string;
-  kit: PrepKit;
-  status: 'ready' | 'draft';
+export interface IKitDoc {
+  _id: string;
+  userId: string;
+  kit: AppendixAKit;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const KitSchema = new Schema<IKitDocument>(
-  {
-    userId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-      index: true,
-    },
-    title: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    company: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    kit: {
-      type: Schema.Types.Mixed,
-      required: true,
-    },
-    status: {
-      type: String,
-      enum: ['ready', 'draft'],
-      default: 'ready',
-    },
-  },
-  {
-    timestamps: true,
-  }
-);
+const KitSchema = new Schema<IKitDoc>({
+  _id: { type: String, required: true },
+  userId: { type: String, required: true, index: true },
+  kit: { type: Schema.Types.Mixed, required: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+}, {
+  _id: false
+});
 
-export const Kit = mongoose.model<IKitDocument>('Kit', KitSchema);
+export const Kit = mongoose.models.Kit || mongoose.model<IKitDoc>('Kit', KitSchema);

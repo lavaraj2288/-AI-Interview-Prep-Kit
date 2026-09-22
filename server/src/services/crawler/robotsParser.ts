@@ -1,58 +1,61 @@
-import axios from 'axios';
 import { URL } from 'url';
 
 export class RobotsParser {
   private disallowedPaths: string[] = [];
 
-  constructor(disallowedPaths: string[] = []) {
-    this.disallowedPaths = disallowedPaths;
+  async fetchAndParse(baseUrl: string): Promise<void> {
+    try {
+      const parsed = new URL(baseUrl);
+      const robotsUrl = `${parsed.protocol}//${parsed.host}/robots.txt`;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+
+      const response = await fetch(robotsUrl, {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'TraoInterviewPrepBot/1.0' }
+      });
+      clearTimeout(timeout);
+
+      if (!response.ok) return;
+
+      const text = await response.text();
+      this.parseRobotsTxt(text);
+    } catch {
+      // If robots.txt fails or 404s, standard behavior is to proceed normally
+      this.disallowedPaths = [];
+    }
   }
 
-  static async load(baseUrl: string, timeoutMs: number = 3000): Promise<RobotsParser> {
-    try {
-      const robotsUrl = new URL('/robots.txt', baseUrl).toString();
-      const response = await axios.get(robotsUrl, {
-        timeout: timeoutMs,
-        headers: { 'User-Agent': 'TraoInterviewPrepBot/1.0 (+https://example.com/bot)' },
-        validateStatus: (status) => status === 200,
-      });
+  private parseRobotsTxt(content: string): void {
+    const lines = content.split('\n');
+    let appliesToAll = false;
 
-      if (typeof response.data !== 'string') {
-        return new RobotsParser([]);
-      }
+    for (let rawLine of lines) {
+      const line = rawLine.split('#')[0].trim();
+      if (!line) continue;
 
-      const disallowed: string[] = [];
-      const lines = response.data.split('\n');
-      let isAllUserAgents = false;
+      const [directive, ...valParts] = line.split(':');
+      const val = valParts.join(':').trim();
 
-      for (const rawLine of lines) {
-        const line = rawLine.trim();
-        if (line.startsWith('#') || !line) continue;
-
-        if (line.toLowerCase().startsWith('user-agent:')) {
-          const agent = line.substring(11).trim();
-          isAllUserAgents = agent === '*' || agent.toLowerCase().includes('trao');
-        } else if (isAllUserAgents && line.toLowerCase().startsWith('disallow:')) {
-          const path = line.substring(9).trim();
-          if (path) disallowed.push(path);
+      if (directive.toLowerCase() === 'user-agent') {
+        appliesToAll = (val === '*');
+      } else if (appliesToAll && directive.toLowerCase() === 'disallow') {
+        if (val) {
+          this.disallowedPaths.push(val);
         }
       }
-
-      return new RobotsParser(disallowed);
-    } catch {
-      // If robots.txt doesn't exist (404) or fails, default to allowing crawling
-      return new RobotsParser([]);
     }
   }
 
   isAllowed(urlString: string): boolean {
     try {
       const parsed = new URL(urlString);
-      const path = parsed.pathname;
+      const pathname = parsed.pathname;
 
       for (const disallowed of this.disallowedPaths) {
         if (disallowed === '/') return false;
-        if (path.startsWith(disallowed)) return false;
+        if (pathname.startsWith(disallowed)) return false;
       }
       return true;
     } catch {

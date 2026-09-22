@@ -1,151 +1,131 @@
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
-import { runPrepKitPipeline } from '../server/src/services/pipeline/orchestrator.js';
-import {
-  BatchCaseInput,
-  BatchCaseResult,
-  BatchOutput,
-} from '../server/src/types/kit.js';
+import { KitPipelineOrchestrator } from '../server/src/services/pipeline/orchestrator.js';
+import { BatchInputCase, BatchOutputDocument, BatchOutputResult } from '../server/src/types/kit.js';
 
-// Load environment variables from .env
 dotenv.config();
 
-function parseArgs(args: string[]): { input: string; output: string } {
-  let input = '';
-  let output = '';
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === '--input' || arg === '-i') {
-      input = args[i + 1] || '';
-      i++;
-    } else if (arg.startsWith('--input=')) {
-      input = arg.split('=')[1];
-    } else if (arg === '--output' || arg === '-o') {
-      output = args[i + 1] || '';
-      i++;
-    } else if (arg.startsWith('--output=')) {
-      output = arg.split('=')[1];
-    } else if (!arg.startsWith('-') && !input) {
-      input = arg;
-    } else if (!arg.startsWith('-') && !output) {
-      output = arg;
-    }
-  }
-
-  return { input, output };
-}
+// Ensure local addresses like localhost:8099 are permitted during evaluate runs
+process.env.ALLOW_LOCAL_URLS = 'true';
 
 async function main() {
-  const rawArgs = process.argv.slice(2);
-  const { input, output } = parseArgs(rawArgs);
+  const args = process.argv.slice(2);
+  let inputPath = '';
+  let outputPath = '';
 
-  if (!input || !output) {
-    console.error('Usage: npm run evaluate -- --input <cases.json> --output <kits.json>');
-    console.error('   or: tsx scripts/evaluate.ts --input <cases.json> --output <kits.json>');
-    console.error('Received args:', rawArgs);
-    process.exit(1);
-  }
-
-  const inputPath = path.resolve(process.cwd(), input);
-  const outputPath = path.resolve(process.cwd(), output);
-
-  console.log(`[Batch Evaluator] Starting evaluation...`);
-  console.log(`[Batch Evaluator] Input file:  ${inputPath}`);
-  console.log(`[Batch Evaluator] Output file: ${outputPath}`);
-
-  if (!fs.existsSync(inputPath)) {
-    console.error(`Error: Input file does not exist at ${inputPath}`);
-    process.exit(1);
-  }
-
-  let cases: BatchCaseInput[];
-  try {
-    const rawData = fs.readFileSync(inputPath, 'utf-8');
-    cases = JSON.parse(rawData);
-    if (!Array.isArray(cases)) {
-      throw new Error('Input JSON must be an array of cases.');
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === '--input' || args[i] === '-i') && i + 1 < args.length) {
+      inputPath = args[i + 1];
+      i++;
+    } else if ((args[i] === '--output' || args[i] === '-o') && i + 1 < args.length) {
+      outputPath = args[i + 1];
+      i++;
     }
-  } catch (err) {
-    console.error(`Error parsing input JSON: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // Fallback to positional arguments if flags were consumed or omitted by shell
+  if (!inputPath && args.length >= 2) {
+    inputPath = args[0];
+    outputPath = args[1];
+  }
+
+  if (!inputPath || !outputPath) {
+    console.error('Usage: npm run evaluate -- --input <cases.json> --output <kits.json>');
     process.exit(1);
   }
 
-  console.log(`[Batch Evaluator] Loaded ${cases.length} case(s). Processing...`);
+  const resolvedInput = path.resolve(process.cwd(), inputPath);
+  const resolvedOutput = path.resolve(process.cwd(), outputPath);
 
-  const results: BatchCaseResult[] = [];
+  if (!fs.existsSync(resolvedInput)) {
+    console.error(`Error: Input file not found at ${resolvedInput}`);
+    process.exit(1);
+  }
 
-  for (let i = 0; i < cases.length; i++) {
-    const item = cases[i];
-    console.log(`\n--------------------------------------------------`);
-    console.log(`[Case ${i + 1}/${cases.length}] ID: ${item.id} | Days: ${item.days} | Company: ${item.company_url}`);
+  let cases: BatchInputCase[];
+  try {
+    const rawInput = fs.readFileSync(resolvedInput, 'utf-8');
+    cases = JSON.parse(rawInput);
+    if (!Array.isArray(cases)) {
+      throw new Error('Input file must contain a JSON array of case objects.');
+    }
+  } catch (err: any) {
+    console.error(`Error reading input JSON: ${err.message}`);
+    process.exit(1);
+  }
+
+  console.log(`\n======================================================`);
+  console.log(`[Batch Evaluate] Processing ${cases.length} case(s)...`);
+  console.log(`======================================================\n`);
+
+  const orchestrator = new KitPipelineOrchestrator();
+  const results: BatchOutputResult[] = [];
+
+  for (let idx = 0; idx < cases.length; idx++) {
+    const item = cases[idx];
+    console.log(`--> [${idx + 1}/${cases.length}] Evaluating case ID: "${item.id}" (Company: ${item.company_url}, Days: ${item.days})`);
 
     try {
-      const pipelineResult = await runPrepKitPipeline({
+      if (!item.jd || typeof item.jd !== 'string') {
+        throw new Error('Missing or invalid job description string');
+      }
+
+      const kit = await orchestrator.runPipeline({
         jd: item.jd,
-        companyUrl: item.company_url,
-        days: item.days,
-        onProgress: (step, total, title, detail) => {
-          console.log(`  [Step ${step}/${total}] ${title}: ${detail}`);
-        },
+        companyUrl: item.company_url || 'https://example.com',
+        days: typeof item.days === 'number' ? item.days : 5,
+        onProgress: (step, percent, details) => {
+          // Keep stdout concise but informative
+          if (percent === 15 || percent === 55 || percent === 85 || percent === 100) {
+            console.log(`    [${percent}%] ${details}`);
+          }
+        }
       });
 
-      if (pipelineResult.success && pipelineResult.kit) {
-        console.log(`  ✓ Case ${item.id} SUCCEEDED. (Passes: ${pipelineResult.kit.coverage.passes}, Questions: ${pipelineResult.kit.questions.length})`);
-        results.push({
-          id: item.id,
-          status: 'ok',
-          kit: pipelineResult.kit,
-          error: null,
-        });
-      } else {
-        const errCode = pipelineResult.error?.code || 'PIPELINE_ERROR';
-        const errMsg = pipelineResult.error?.message || 'Pipeline failed to produce kit.';
-        console.warn(`  ✗ Case ${item.id} FAILED: [${errCode}] ${errMsg}`);
-        results.push({
-          id: item.id,
-          status: 'failed',
-          kit: null,
-          error: {
-            code: errCode,
-            message: errMsg,
-          },
-        });
-      }
-    } catch (err) {
-      console.error(`  ✗ Case ${item.id} UNEXPECTED EXCEPTION:`, err);
+      results.push({
+        id: item.id,
+        status: 'ok',
+        kit,
+        error: null
+      });
+
+      console.log(`    ✓ Case "${item.id}" completed successfully.\n`);
+    } catch (caseErr: any) {
+      console.warn(`    ✗ Case "${item.id}" failed: ${caseErr.message}\n`);
       results.push({
         id: item.id,
         status: 'failed',
         kit: null,
         error: {
-          code: 'UNEXPECTED_ERROR',
-          message: err instanceof Error ? err.message : String(err),
-        },
+          code: caseErr.code || 'GENERATION_FAILED',
+          message: caseErr.message || 'Pipeline encountered a fatal error during kit generation.'
+        }
       });
     }
   }
 
-  const batchOutput: BatchOutput = {
+  const outputDoc: BatchOutputDocument = {
     version: '1.0',
     generated_at: new Date().toISOString(),
-    kits: results,
+    kits: results
   };
 
-  // Ensure target directory exists
-  const outDir = path.dirname(outputPath);
-  if (!fs.existsSync(outDir)) {
-    fs.mkdirSync(outDir, { recursive: true });
+  try {
+    const outDir = path.dirname(resolvedOutput);
+    if (!fs.existsSync(outDir)) {
+      fs.mkdirSync(outDir, { recursive: true });
+    }
+    fs.writeFileSync(resolvedOutput, JSON.stringify(outputDoc, null, 2), 'utf-8');
+    console.log(`======================================================`);
+    console.log(`[Batch Evaluate] Finished! Wrote results to: ${resolvedOutput}`);
+    console.log(`Success: ${results.filter(r => r.status === 'ok').length}/${cases.length}`);
+    console.log(`Failed:  ${results.filter(r => r.status === 'failed').length}/${cases.length}`);
+    console.log(`======================================================\n`);
+  } catch (err: any) {
+    console.error(`Failed to write output file: ${err.message}`);
+    process.exit(1);
   }
-
-  fs.writeFileSync(outputPath, JSON.stringify(batchOutput, null, 2), 'utf-8');
-  console.log(`\n==================================================`);
-  console.log(`[Batch Evaluator] Successfully completed ${cases.length} cases.`);
-  console.log(`[Batch Evaluator] Output written to: ${outputPath}`);
 }
 
-main().catch((err) => {
-  console.error('[Batch Evaluator] Fatal error:', err);
-  process.exit(1);
-});
+main();

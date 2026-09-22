@@ -1,92 +1,92 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { authApi } from '@/lib/api';
+import { api, setAuthToken } from '../../lib/api';
+import { Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+    setLoading(true);
 
     try {
-      const res = await authApi.login(email, password);
-      localStorage.setItem('trao_prep_token', res.token);
-      localStorage.setItem('trao_prep_user', JSON.stringify(res.user));
-      router.push('/dashboard');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid login credentials');
+      const res = await api.login({ email, password });
+      setAuthToken(res.token);
+      window.location.href = '/dashboard';
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md bg-white p-8 rounded-2xl border border-slate-200 shadow-md">
-        <h2 className="text-2xl font-bold text-slate-900 text-center mb-2">Welcome Back</h2>
-        <p className="text-sm text-slate-500 text-center mb-6">
-          Sign in to access your interview preparation kits
-        </p>
+    <div className="max-w-md mx-auto my-12 p-8 rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-md shadow-xl">
+      <div className="text-center space-y-2 mb-8">
+        <h2 className="text-2xl font-bold text-white tracking-tight">Welcome Back</h2>
+        <p className="text-sm text-slate-400">Sign in to manage and practice your interview prep kits.</p>
+      </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
-            {error}
-          </div>
-        )}
+      {error && (
+        <div className="mb-6 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Email Address
-            </label>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Email Address</label>
+          <div className="relative">
+            <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
             <input
               type="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={e => setEmail(e.target.value)}
               placeholder="candidate@example.com"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition"
             />
           </div>
+        </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Password
-            </label>
+        <div>
+          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Password</label>
+          <div className="relative">
+            <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
             <input
               type="password"
               required
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition"
             />
           </div>
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-sm shadow transition disabled:opacity-50"
-          >
-            {loading ? 'Signing In...' : 'Sign In'}
-          </button>
-        </form>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full mt-4 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-xl shadow transition"
+        >
+          {loading ? 'Signing in...' : 'Sign In'}
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </form>
 
-        <p className="text-xs text-center text-slate-500 mt-6">
-          Don't have an account?{' '}
-          <Link href="/register" className="text-blue-600 font-semibold hover:underline">
-            Create an account
-          </Link>
-        </p>
+      <div className="mt-6 text-center text-xs text-slate-400">
+        Don&apos;t have an account?{' '}
+        <Link href="/register" className="text-emerald-400 hover:underline font-medium">
+          Create one now
+        </Link>
       </div>
     </div>
   );

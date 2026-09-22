@@ -1,59 +1,69 @@
 {
   "version": "1.0",
-  "generated_at": "2026-09-22T11:43:45.634Z",
+  "generated_at": "2026-09-22T12:30:35.917Z",
   "kits": [
     {
       "id": "case-01",
       "status": "ok",
       "kit": {
         "source": {
-          "company": "Example Domain",
-          "company_url": "https://example.com/",
-          "role": "Senior Full Stack Engineer",
-          "location": "Remote / Hybrid",
-          "jd_chars": 222,
-          "researched_at": "2026-09-22T11:43:31.130Z",
+          "company": "Acme",
+          "company_url": "http://localhost:8099/acme/",
+          "role": "Senior Backend Engineer at Acme",
+          "location": "Remote / Unspecified",
+          "jd_chars": 555,
+          "researched_at": "2026-09-22T12:30:27.986Z",
           "pages_used": [
-            "https://example.com/"
+            "http://localhost:8099/acme/"
           ]
         },
         "company_brief": {
-          "summary": "Example Domain builds innovative software solutions with an engineering-first culture and high-velocity delivery.",
-          "what_they_do": "Example Domain develops modern web, cloud, and distributed backend platforms to serve customer needs.",
+          "summary": "Acme is a technology company. Limited public information was directly discoverable at the provided domain.",
+          "what_they_do": "Based on initial discovery, Acme operates at http://localhost:8099/acme/. Specific hiring guidelines or engineering handbooks were not publicly exposed.",
           "sources": [
-            "https://example.com/"
+            "http://localhost:8099/acme/"
           ]
         },
         "role": {
-          "title": "Senior Full Stack Engineer",
-          "seniority": "Senior",
+          "title": "Senior Backend Engineer at Acme",
+          "seniority": "Lead / Staff",
           "responsibilities": [
-            "Design, build, and maintain efficient, scalable, and reliable software components",
-            "Collaborate with cross-functional stakeholders to define, scope, and deliver business initiatives",
-            "Uphold high standards of code hygiene, test coverage, and documentation"
+            "Collaborate with cross-functional teams to deliver high-quality solutions."
           ],
           "requirements": [
             {
               "id": "r1",
-              "text": "5+ years with React and TypeScript",
+              "text": "5+ years of experience with Node.js and TypeScript (must)",
               "kind": "technical",
               "priority": "must"
             },
             {
               "id": "r2",
-              "text": "strong distributed systems experience",
+              "text": "Deep knowledge of PostgreSQL and Redis caching strategies (must)",
               "kind": "technical",
               "priority": "must"
             },
             {
               "id": "r3",
-              "text": "mentoring skills",
-              "kind": "behavioural",
+              "text": "Hands-on experience with Kubernetes and Docker in production (must)",
+              "kind": "technical",
               "priority": "must"
             },
             {
               "id": "r4",
-              "text": "GraphQL and Kubernetes",
+              "text": "Track record of mentoring junior engineers and leading code reviews (must)",
+              "kind": "behavioural",
+              "priority": "must"
+            },
+            {
+              "id": "r5",
+              "text": "Bonus points for experience with Go or Rust (nice to have)",
+              "kind": "technical",
+              "priority": "nice"
+            },
+            {
+              "id": "r6",
+              "text": "Familiarity with Apache Kafka or event-driven streaming is a plus (nice to have)",
               "kind": "technical",
               "priority": "nice"
             }
@@ -66,11 +76,9 @@
               "r1"
             ],
             "category": "technical",
-            "prompt": "Describe a challenging project where you demonstrated: 5+ years with React and TypeScript. What was the outcome?",
-            "answer_outline": "1. Clarify requirements, constraints, and baseline assumptions.\n2. Walk through architecture/implementation with concrete technical rationale.\n3. Discuss edge cases, failure modes, trade-offs, and lessons learned.",
-            "difficulty": 3,
-            "origin": "generated",
-            "pinned": false
+            "prompt": "Explain the core principles and common pitfalls when working with: \"5+ years of experience with Node.js and TypeScript (must)\". How do you ensure high performance and maintainability?",
+            "answer_outline": "1. Explain core mechanisms. 2. Discuss memory/runtime complexity and failure modes. 3. Detail automated testing strategies.",
+            "difficulty": 3
           },
           {
             "id": "q2",
@@ -78,113 +86,119 @@
               "r2"
             ],
             "category": "technical",
-            "prompt": "Describe a challenging project where you demonstrated: strong distributed systems experience. What was the outcome?",
-            "answer_outline": "1. Clarify requirements, constraints, and baseline assumptions.\n2. Walk through architecture/implementation with concrete technical rationale.\n3. Discuss edge cases, failure modes, trade-offs, and lessons learned.",
-            "difficulty": 3,
-            "origin": "generated",
-            "pinned": false
+            "prompt": "Explain the core principles and common pitfalls when working with: \"Deep knowledge of PostgreSQL and Redis caching strategies (must)\". How do you ensure high performance and maintainability?",
+            "answer_outline": "1. Explain core mechanisms. 2. Discuss memory/runtime complexity and failure modes. 3. Detail automated testing strategies.",
+            "difficulty": 3
           },
           {
             "id": "q3",
             "requirement_ids": [
-              "r4"
+              "r3"
             ],
             "category": "technical",
-            "prompt": "Describe a challenging project where you demonstrated: GraphQL and Kubernetes. What was the outcome?",
-            "answer_outline": "1. Clarify requirements, constraints, and baseline assumptions.\n2. Walk through architecture/implementation with concrete technical rationale.\n3. Discuss edge cases, failure modes, trade-offs, and lessons learned.",
-            "difficulty": 3,
-            "origin": "generated",
-            "pinned": false
+            "prompt": "Explain the core principles and common pitfalls when working with: \"Hands-on experience with Kubernetes and Docker in production (must)\". How do you ensure high performance and maintainability?",
+            "answer_outline": "1. Explain core mechanisms. 2. Discuss memory/runtime complexity and failure modes. 3. Detail automated testing strategies.",
+            "difficulty": 3
           },
           {
             "id": "q4",
             "requirement_ids": [
-              "r3"
+              "r1"
             ],
-            "category": "behavioural",
-            "prompt": "Describe a challenging project where you demonstrated: mentoring skills. What was the outcome?",
-            "answer_outline": "1. Clarify requirements, constraints, and baseline assumptions.\n2. Walk through architecture/implementation with concrete technical rationale.\n3. Discuss edge cases, failure modes, trade-offs, and lessons learned.",
-            "difficulty": 3,
-            "origin": "generated",
-            "pinned": false
+            "category": "system-design",
+            "prompt": "Design a resilient, scalable subsystem addressing requirement: \"5+ years of experience with Node.js and TypeScript (must)\". What data models and APIs would you implement?",
+            "answer_outline": "1. Identify bottlenecks & throughput. 2. Partitioning / caching patterns. 3. Fault-tolerance & monitoring.",
+            "difficulty": 3
           },
           {
             "id": "q5",
             "requirement_ids": [
-              "r1"
+              "r2"
             ],
             "category": "system-design",
-            "prompt": "Describe a challenging project where you demonstrated: 5+ years with React and TypeScript. What was the outcome?",
-            "answer_outline": "1. Clarify requirements, constraints, and baseline assumptions.\n2. Walk through architecture/implementation with concrete technical rationale.\n3. Discuss edge cases, failure modes, trade-offs, and lessons learned.",
-            "difficulty": 3,
-            "origin": "generated",
-            "pinned": false
+            "prompt": "Design a resilient, scalable subsystem addressing requirement: \"Deep knowledge of PostgreSQL and Redis caching strategies (must)\". What data models and APIs would you implement?",
+            "answer_outline": "1. Identify bottlenecks & throughput. 2. Partitioning / caching patterns. 3. Fault-tolerance & monitoring.",
+            "difficulty": 3
           },
           {
             "id": "q6",
             "requirement_ids": [
-              "r2"
+              "r3"
             ],
             "category": "system-design",
-            "prompt": "Describe a challenging project where you demonstrated: strong distributed systems experience. What was the outcome?",
-            "answer_outline": "1. Clarify requirements, constraints, and baseline assumptions.\n2. Walk through architecture/implementation with concrete technical rationale.\n3. Discuss edge cases, failure modes, trade-offs, and lessons learned.",
-            "difficulty": 3,
-            "origin": "generated",
-            "pinned": false
+            "prompt": "Design a resilient, scalable subsystem addressing requirement: \"Hands-on experience with Kubernetes and Docker in production (must)\". What data models and APIs would you implement?",
+            "answer_outline": "1. Identify bottlenecks & throughput. 2. Partitioning / caching patterns. 3. Fault-tolerance & monitoring.",
+            "difficulty": 3
           },
           {
             "id": "q7",
             "requirement_ids": [
-              "r3"
+              "r4"
             ],
-            "category": "system-design",
-            "prompt": "Describe a challenging project where you demonstrated: mentoring skills. What was the outcome?",
-            "answer_outline": "1. Clarify requirements, constraints, and baseline assumptions.\n2. Walk through architecture/implementation with concrete technical rationale.\n3. Discuss edge cases, failure modes, trade-offs, and lessons learned.",
-            "difficulty": 3,
-            "origin": "generated",
-            "pinned": false
+            "category": "behavioural",
+            "prompt": "Tell me about a time you demonstrated strong capability in: \"Track record of mentoring junior engineers and leading code reviews (must)\". What was the situation, your specific action, and the measurable outcome?",
+            "answer_outline": "Use STAR format: Situation, Task, Action, and measurable Result. Highlight communication and conflict resolution.",
+            "difficulty": 2
+          },
+          {
+            "id": "q8",
+            "requirement_ids": [
+              "r4"
+            ],
+            "category": "company-fit",
+            "prompt": "How do your past engineering experiences and approach to \"Track record of mentoring junior engineers and leading code reviews (must)\" align with our team's mission and culture?",
+            "answer_outline": "Connect technical values to business objectives. Emphasize adaptability, continuous learning, and cross-team empathy.",
+            "difficulty": 1
           }
         ],
         "flashcards": [
           {
             "id": "f1",
-            "front": "Key concepts & principles: 5+ years with React and TypeScript",
-            "back": "Core architectural best practices, syntax nuances, and common pitfall mitigations for 5+ years with React and TypeScript.",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"5+ years of experience with Node.js and TypeScript (must)\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for 5+ years of experience with Node.js and TypeScript (must).",
             "requirement_ids": [
               "r1"
-            ],
-            "origin": "generated",
-            "pinned": false
+            ]
           },
           {
             "id": "f2",
-            "front": "Key concepts & principles: strong distributed systems experience",
-            "back": "Core architectural best practices, syntax nuances, and common pitfall mitigations for strong distributed systems experience.",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"Deep knowledge of PostgreSQL and Redis caching strategies (must)\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for Deep knowledge of PostgreSQL and Redis caching strategies (must).",
             "requirement_ids": [
               "r2"
-            ],
-            "origin": "generated",
-            "pinned": false
+            ]
           },
           {
             "id": "f3",
-            "front": "Key concepts & principles: GraphQL and Kubernetes",
-            "back": "Core architectural best practices, syntax nuances, and common pitfall mitigations for GraphQL and Kubernetes.",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"Hands-on experience with Kubernetes and Docker in production (must)\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for Hands-on experience with Kubernetes and Docker in production (must).",
             "requirement_ids": [
-              "r4"
-            ],
-            "origin": "generated",
-            "pinned": false
+              "r3"
+            ]
           },
           {
             "id": "f4",
-            "front": "Key concepts & principles: mentoring skills",
-            "back": "Core architectural best practices, syntax nuances, and common pitfall mitigations for mentoring skills.",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"Track record of mentoring junior engineers and leading code reviews (must)\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for Track record of mentoring junior engineers and leading code reviews (must).",
             "requirement_ids": [
-              "r3"
-            ],
-            "origin": "generated",
-            "pinned": false
+              "r4"
+            ]
+          },
+          {
+            "id": "f5",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"Bonus points for experience with Go or Rust (nice to have)\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for Bonus points for experience with Go or Rust (nice to have).",
+            "requirement_ids": [
+              "r5"
+            ]
+          },
+          {
+            "id": "f6",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"Familiarity with Apache Kafka or event-driven streaming is a plus (nice to have)\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for Familiarity with Apache Kafka or event-driven streaming is a plus (nice to have).",
+            "requirement_ids": [
+              "r6"
+            ]
           }
         ],
         "schedule": {
@@ -192,45 +206,279 @@
           "days": [
             {
               "day": 1,
-              "focus": "Core Must-Haves & Foundational Deep Dive",
-              "question_ids": [
-                "q5",
-                "q6"
-              ],
-              "minutes": 50
-            },
-            {
-              "day": 2,
-              "focus": "Technical Mastery & Practical Problem Solving",
+              "focus": "Technical Mastery & Code Implementation",
               "question_ids": [
                 "q1",
                 "q2"
               ],
-              "minutes": 50
+              "minutes": 70
+            },
+            {
+              "day": 2,
+              "focus": "Architecture, System Design & Core Technical Deep-Dive",
+              "question_ids": [
+                "q3",
+                "q4"
+              ],
+              "minutes": 70
             },
             {
               "day": 3,
-              "focus": "System Architecture, Scalability & Design Trade-offs",
+              "focus": "Core Review: system-design",
               "question_ids": [
-                "q7"
+                "q5",
+                "q6"
               ],
-              "minutes": 30
+              "minutes": 70
             },
             {
               "day": 4,
-              "focus": "Leadership, Behavioral Scenarios & STAR Responses",
+              "focus": "STAR Stories, Mentorship & Behavioural Competencies",
               "question_ids": [
-                "q4"
+                "q7"
               ],
-              "minutes": 30
+              "minutes": 45
             },
             {
               "day": 5,
-              "focus": "Final Polish, Company Alignment & Mock Drills",
+              "focus": "Company Culture, Values & Final Alignment",
+              "question_ids": [
+                "q8"
+              ],
+              "minutes": 45
+            }
+          ]
+        },
+        "coverage": {
+          "uncovered_requirement_ids": [
+            "r5",
+            "r6"
+          ],
+          "passes": 1
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "case-02",
+      "status": "ok",
+      "kit": {
+        "source": {
+          "company": "Posthog",
+          "company_url": "https://posthog.com",
+          "role": "Full Stack Engineer",
+          "location": "Remote / Unspecified",
+          "jd_chars": 267,
+          "researched_at": "2026-09-22T12:30:32.137Z",
+          "pages_used": [
+            "https://posthog.com/",
+            "https://posthog.com/about",
+            "https://posthog.com/careers"
+          ]
+        },
+        "company_brief": {
+          "summary": "Posthog build modern digital solutions. Research indicates focus on scalable services and user-centric software.",
+          "what_they_do": "--- PostHog – We make your product self-drivingPostHogPostHog (https://posthog.com/) --- Make your product self-driving PostHog already has your analytics and errors. Now it ships code to help you build a better product. Join 500,000+ teams already shipping with PostHog. Set upfor free 97% of users ",
+          "sources": [
+            "https://posthog.com/",
+            "https://posthog.com/about",
+            "https://posthog.com/careers"
+          ]
+        },
+        "role": {
+          "title": "Full Stack Engineer",
+          "seniority": "Mid-Senior",
+          "responsibilities": [
+            "Experience building data-intensive user interfaces"
+          ],
+          "requirements": [
+            {
+              "id": "r1",
+              "text": "Proficiency in Python / Django and React / TypeScript",
+              "kind": "technical",
+              "priority": "must"
+            },
+            {
+              "id": "r2",
+              "text": "Experience building data-intensive user interfaces",
+              "kind": "technical",
+              "priority": "must"
+            },
+            {
+              "id": "r3",
+              "text": "Strong ownership mindset and open-source contribution history is preferred",
+              "kind": "technical",
+              "priority": "nice"
+            }
+          ]
+        },
+        "questions": [
+          {
+            "id": "q1",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "technical",
+            "prompt": "Explain the core principles and common pitfalls when working with: \"Proficiency in Python / Django and React / TypeScript\". How do you ensure high performance and maintainability?",
+            "answer_outline": "1. Explain core mechanisms. 2. Discuss memory/runtime complexity and failure modes. 3. Detail automated testing strategies.",
+            "difficulty": 3
+          },
+          {
+            "id": "q2",
+            "requirement_ids": [
+              "r2"
+            ],
+            "category": "technical",
+            "prompt": "Explain the core principles and common pitfalls when working with: \"Experience building data-intensive user interfaces\". How do you ensure high performance and maintainability?",
+            "answer_outline": "1. Explain core mechanisms. 2. Discuss memory/runtime complexity and failure modes. 3. Detail automated testing strategies.",
+            "difficulty": 3
+          },
+          {
+            "id": "q3",
+            "requirement_ids": [
+              "r3"
+            ],
+            "category": "technical",
+            "prompt": "Explain the core principles and common pitfalls when working with: \"Strong ownership mindset and open-source contribution history is preferred\". How do you ensure high performance and maintainability?",
+            "answer_outline": "1. Explain core mechanisms. 2. Discuss memory/runtime complexity and failure modes. 3. Detail automated testing strategies.",
+            "difficulty": 2
+          },
+          {
+            "id": "q4",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "system-design",
+            "prompt": "Design a resilient, scalable subsystem addressing requirement: \"Proficiency in Python / Django and React / TypeScript\". What data models and APIs would you implement?",
+            "answer_outline": "1. Identify bottlenecks & throughput. 2. Partitioning / caching patterns. 3. Fault-tolerance & monitoring.",
+            "difficulty": 3
+          },
+          {
+            "id": "q5",
+            "requirement_ids": [
+              "r2"
+            ],
+            "category": "system-design",
+            "prompt": "Design a resilient, scalable subsystem addressing requirement: \"Experience building data-intensive user interfaces\". What data models and APIs would you implement?",
+            "answer_outline": "1. Identify bottlenecks & throughput. 2. Partitioning / caching patterns. 3. Fault-tolerance & monitoring.",
+            "difficulty": 3
+          },
+          {
+            "id": "q6",
+            "requirement_ids": [
+              "r3"
+            ],
+            "category": "system-design",
+            "prompt": "Design a resilient, scalable subsystem addressing requirement: \"Strong ownership mindset and open-source contribution history is preferred\". What data models and APIs would you implement?",
+            "answer_outline": "1. Identify bottlenecks & throughput. 2. Partitioning / caching patterns. 3. Fault-tolerance & monitoring.",
+            "difficulty": 3
+          },
+          {
+            "id": "q7",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "behavioural",
+            "prompt": "Tell me about a time you demonstrated strong capability in: \"Proficiency in Python / Django and React / TypeScript\". What was the situation, your specific action, and the measurable outcome?",
+            "answer_outline": "Use STAR format: Situation, Task, Action, and measurable Result. Highlight communication and conflict resolution.",
+            "difficulty": 2
+          },
+          {
+            "id": "q8",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "company-fit",
+            "prompt": "How do your past engineering experiences and approach to \"Proficiency in Python / Django and React / TypeScript\" align with our team's mission and culture?",
+            "answer_outline": "Connect technical values to business objectives. Emphasize adaptability, continuous learning, and cross-team empathy.",
+            "difficulty": 1
+          }
+        ],
+        "flashcards": [
+          {
+            "id": "f1",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"Proficiency in Python / Django and React / TypeScript\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for Proficiency in Python / Django and React / TypeScript.",
+            "requirement_ids": [
+              "r1"
+            ]
+          },
+          {
+            "id": "f2",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"Experience building data-intensive user interfaces\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for Experience building data-intensive user interfaces.",
+            "requirement_ids": [
+              "r2"
+            ]
+          },
+          {
+            "id": "f3",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"Strong ownership mindset and open-source contribution history is preferred\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for Strong ownership mindset and open-source contribution history is preferred.",
+            "requirement_ids": [
+              "r3"
+            ]
+          }
+        ],
+        "schedule": {
+          "days_available": 7,
+          "days": [
+            {
+              "day": 1,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q1",
+                "q2"
+              ],
+              "minutes": 70
+            },
+            {
+              "day": 2,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q4"
+              ],
+              "minutes": 45
+            },
+            {
+              "day": 3,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q5"
+              ],
+              "minutes": 45
+            },
+            {
+              "day": 4,
+              "focus": "STAR Stories, Mentorship & Behavioural Competencies",
+              "question_ids": [
+                "q7"
+              ],
+              "minutes": 45
+            },
+            {
+              "day": 5,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q6"
+              ],
+              "minutes": 45
+            },
+            {
+              "day": 6,
+              "focus": "Company Culture, Values & Final Alignment",
+              "question_ids": [
+                "q8"
+              ],
+              "minutes": 45
+            },
+            {
+              "day": 7,
+              "focus": "Technical Mastery & Code Implementation",
               "question_ids": [
                 "q3"
               ],
-              "minutes": 30
+              "minutes": 45
             }
           ]
         },
@@ -242,39 +490,37 @@
       "error": null
     },
     {
-      "id": "case-02",
+      "id": "case-03-stub",
       "status": "ok",
       "kit": {
         "source": {
-          "company": "Example Domain",
-          "company_url": "https://example.org/",
-          "role": "Backend Developer",
-          "location": "Remote / Hybrid",
-          "jd_chars": 61,
-          "researched_at": "2026-09-22T11:43:45.633Z",
+          "company": "Example",
+          "company_url": "https://example.com",
+          "role": "React Developer needed.",
+          "location": "Remote / Unspecified",
+          "jd_chars": 63,
+          "researched_at": "2026-09-22T12:30:33.574Z",
           "pages_used": [
-            "https://example.org/"
+            "https://example.com/"
           ]
         },
         "company_brief": {
-          "summary": "Example Domain builds innovative software solutions with an engineering-first culture and high-velocity delivery.",
-          "what_they_do": "Example Domain develops modern web, cloud, and distributed backend platforms to serve customer needs.",
+          "summary": "Example build modern digital solutions. Research indicates focus on scalable services and user-centric software.",
+          "what_they_do": "--- Example Domain (https://example.com/) --- Example Domain This domain is for use in documentation examples without needing permission. Avoid use in operations. Learn more",
           "sources": [
-            "https://example.org/"
+            "https://example.com/"
           ]
         },
         "role": {
-          "title": "Backend Developer",
-          "seniority": "Mid-level",
+          "title": "React Developer needed.",
+          "seniority": "Mid-Senior",
           "responsibilities": [
-            "Design, build, and maintain efficient, scalable, and reliable software components",
-            "Collaborate with cross-functional stakeholders to define, scope, and deliver business initiatives",
-            "Uphold high standards of code hygiene, test coverage, and documentation"
+            "React Developer needed."
           ],
           "requirements": [
             {
               "id": "r1",
-              "text": "Build Python APIs and PostgreSQL databases",
+              "text": "Must know modern React, Redux, and CSS.",
               "kind": "technical",
               "priority": "must"
             }
@@ -287,76 +533,873 @@
               "r1"
             ],
             "category": "technical",
-            "prompt": "Describe a challenging project where you demonstrated: Build Python APIs and PostgreSQL databases. What was the outcome?",
-            "answer_outline": "1. Clarify requirements, constraints, and baseline assumptions.\n2. Walk through architecture/implementation with concrete technical rationale.\n3. Discuss edge cases, failure modes, trade-offs, and lessons learned.",
-            "difficulty": 3,
-            "origin": "generated",
-            "pinned": false
+            "prompt": "Explain the core principles and common pitfalls when working with: \"Must know modern React, Redux, and CSS.\". How do you ensure high performance and maintainability?",
+            "answer_outline": "1. Explain core mechanisms. 2. Discuss memory/runtime complexity and failure modes. 3. Detail automated testing strategies.",
+            "difficulty": 3
           },
           {
             "id": "q2",
             "requirement_ids": [
               "r1"
             ],
-            "category": "behavioural",
-            "prompt": "Describe a challenging project where you demonstrated: Build Python APIs and PostgreSQL databases. What was the outcome?",
-            "answer_outline": "1. Clarify requirements, constraints, and baseline assumptions.\n2. Walk through architecture/implementation with concrete technical rationale.\n3. Discuss edge cases, failure modes, trade-offs, and lessons learned.",
-            "difficulty": 3,
-            "origin": "generated",
-            "pinned": false
+            "category": "system-design",
+            "prompt": "Design a resilient, scalable subsystem addressing requirement: \"Must know modern React, Redux, and CSS.\". What data models and APIs would you implement?",
+            "answer_outline": "1. Identify bottlenecks & throughput. 2. Partitioning / caching patterns. 3. Fault-tolerance & monitoring.",
+            "difficulty": 3
           },
           {
             "id": "q3",
             "requirement_ids": [
               "r1"
             ],
+            "category": "behavioural",
+            "prompt": "Tell me about a time you demonstrated strong capability in: \"Must know modern React, Redux, and CSS.\". What was the situation, your specific action, and the measurable outcome?",
+            "answer_outline": "Use STAR format: Situation, Task, Action, and measurable Result. Highlight communication and conflict resolution.",
+            "difficulty": 2
+          },
+          {
+            "id": "q4",
+            "requirement_ids": [
+              "r1"
+            ],
             "category": "company-fit",
-            "prompt": "Describe a challenging project where you demonstrated: Build Python APIs and PostgreSQL databases. What was the outcome?",
-            "answer_outline": "1. Clarify requirements, constraints, and baseline assumptions.\n2. Walk through architecture/implementation with concrete technical rationale.\n3. Discuss edge cases, failure modes, trade-offs, and lessons learned.",
-            "difficulty": 2,
-            "origin": "generated",
-            "pinned": false
+            "prompt": "How do your past engineering experiences and approach to \"Must know modern React, Redux, and CSS.\" align with our team's mission and culture?",
+            "answer_outline": "Connect technical values to business objectives. Emphasize adaptability, continuous learning, and cross-team empathy.",
+            "difficulty": 1
           }
         ],
         "flashcards": [
           {
             "id": "f1",
-            "front": "Key concepts & principles: Build Python APIs and PostgreSQL databases",
-            "back": "Core architectural best practices, syntax nuances, and common pitfall mitigations for Build Python APIs and PostgreSQL databases.",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"Must know modern React, Redux, and CSS.\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for Must know modern React, Redux, and CSS..",
             "requirement_ids": [
               "r1"
-            ],
-            "origin": "generated",
-            "pinned": false
-          },
-          {
-            "id": "f2",
-            "front": "Key concepts & principles: Build Python APIs and PostgreSQL databases",
-            "back": "Core architectural best practices, syntax nuances, and common pitfall mitigations for Build Python APIs and PostgreSQL databases.",
-            "requirement_ids": [
-              "r1"
-            ],
-            "origin": "generated",
-            "pinned": false
+            ]
           }
         ],
         "schedule": {
-          "days_available": 2,
+          "days_available": 3,
           "days": [
             {
               "day": 1,
-              "focus": "Core Must-Haves & Foundational Deep Dive",
+              "focus": "Architecture, System Design & Core Technical Deep-Dive",
               "question_ids": [
                 "q1",
                 "q2"
               ],
-              "minutes": 50
+              "minutes": 70
             },
             {
               "day": 2,
-              "focus": "Final Polish, Company Alignment & Mock Drills",
+              "focus": "STAR Stories, Mentorship & Behavioural Competencies",
               "question_ids": [
                 "q3"
+              ],
+              "minutes": 45
+            },
+            {
+              "day": 3,
+              "focus": "Company Culture, Values & Final Alignment",
+              "question_ids": [
+                "q4"
+              ],
+              "minutes": 45
+            }
+          ]
+        },
+        "coverage": {
+          "uncovered_requirement_ids": [],
+          "passes": 1
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "case-04-oneday",
+      "status": "ok",
+      "kit": {
+        "source": {
+          "company": "Example",
+          "company_url": "https://example.com",
+          "role": "DevOps Engineer",
+          "location": "Remote / Unspecified",
+          "jd_chars": 105,
+          "researched_at": "2026-09-22T12:30:34.685Z",
+          "pages_used": [
+            "https://example.com/"
+          ]
+        },
+        "company_brief": {
+          "summary": "Example build modern digital solutions. Research indicates focus on scalable services and user-centric software.",
+          "what_they_do": "--- Example Domain (https://example.com/) --- Example Domain This domain is for use in documentation examples without needing permission. Avoid use in operations. Learn more",
+          "sources": [
+            "https://example.com/"
+          ]
+        },
+        "role": {
+          "title": "DevOps Engineer",
+          "seniority": "Mid-Senior",
+          "responsibilities": [
+            "Collaborate with cross-functional teams to deliver high-quality solutions."
+          ],
+          "requirements": [
+            {
+              "id": "r1",
+              "text": "AWS VPC, Terraform, CI/CD pipelines",
+              "kind": "technical",
+              "priority": "must"
+            },
+            {
+              "id": "r2",
+              "text": "Linux system administration and incident response",
+              "kind": "technical",
+              "priority": "must"
+            }
+          ]
+        },
+        "questions": [
+          {
+            "id": "q1",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "technical",
+            "prompt": "Explain the core principles and common pitfalls when working with: \"AWS VPC, Terraform, CI/CD pipelines\". How do you ensure high performance and maintainability?",
+            "answer_outline": "1. Explain core mechanisms. 2. Discuss memory/runtime complexity and failure modes. 3. Detail automated testing strategies.",
+            "difficulty": 3
+          },
+          {
+            "id": "q2",
+            "requirement_ids": [
+              "r2"
+            ],
+            "category": "technical",
+            "prompt": "Explain the core principles and common pitfalls when working with: \"Linux system administration and incident response\". How do you ensure high performance and maintainability?",
+            "answer_outline": "1. Explain core mechanisms. 2. Discuss memory/runtime complexity and failure modes. 3. Detail automated testing strategies.",
+            "difficulty": 3
+          },
+          {
+            "id": "q3",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "system-design",
+            "prompt": "Design a resilient, scalable subsystem addressing requirement: \"AWS VPC, Terraform, CI/CD pipelines\". What data models and APIs would you implement?",
+            "answer_outline": "1. Identify bottlenecks & throughput. 2. Partitioning / caching patterns. 3. Fault-tolerance & monitoring.",
+            "difficulty": 3
+          },
+          {
+            "id": "q4",
+            "requirement_ids": [
+              "r2"
+            ],
+            "category": "system-design",
+            "prompt": "Design a resilient, scalable subsystem addressing requirement: \"Linux system administration and incident response\". What data models and APIs would you implement?",
+            "answer_outline": "1. Identify bottlenecks & throughput. 2. Partitioning / caching patterns. 3. Fault-tolerance & monitoring.",
+            "difficulty": 3
+          },
+          {
+            "id": "q5",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "behavioural",
+            "prompt": "Tell me about a time you demonstrated strong capability in: \"AWS VPC, Terraform, CI/CD pipelines\". What was the situation, your specific action, and the measurable outcome?",
+            "answer_outline": "Use STAR format: Situation, Task, Action, and measurable Result. Highlight communication and conflict resolution.",
+            "difficulty": 2
+          },
+          {
+            "id": "q6",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "company-fit",
+            "prompt": "How do your past engineering experiences and approach to \"AWS VPC, Terraform, CI/CD pipelines\" align with our team's mission and culture?",
+            "answer_outline": "Connect technical values to business objectives. Emphasize adaptability, continuous learning, and cross-team empathy.",
+            "difficulty": 1
+          }
+        ],
+        "flashcards": [
+          {
+            "id": "f1",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"AWS VPC, Terraform, CI/CD pipelines\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for AWS VPC, Terraform, CI/CD pipelines.",
+            "requirement_ids": [
+              "r1"
+            ]
+          },
+          {
+            "id": "f2",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"Linux system administration and incident response\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for Linux system administration and incident response.",
+            "requirement_ids": [
+              "r2"
+            ]
+          }
+        ],
+        "schedule": {
+          "days_available": 1,
+          "days": [
+            {
+              "day": 1,
+              "focus": "Architecture, System Design & Core Technical Deep-Dive",
+              "question_ids": [
+                "q1",
+                "q2",
+                "q3",
+                "q4",
+                "q5",
+                "q6"
+              ],
+              "minutes": 180
+            }
+          ]
+        },
+        "coverage": {
+          "uncovered_requirement_ids": [],
+          "passes": 1
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "case-05-sixtyday",
+      "status": "ok",
+      "kit": {
+        "source": {
+          "company": "Example",
+          "company_url": "https://example.com",
+          "role": "Staff AI Engineer",
+          "location": "Remote / Unspecified",
+          "jd_chars": 177,
+          "researched_at": "2026-09-22T12:30:35.915Z",
+          "pages_used": [
+            "https://example.com/"
+          ]
+        },
+        "company_brief": {
+          "summary": "Example build modern digital solutions. Research indicates focus on scalable services and user-centric software.",
+          "what_they_do": "--- Example Domain (https://example.com/) --- Example Domain This domain is for use in documentation examples without needing permission. Avoid use in operations. Learn more",
+          "sources": [
+            "https://example.com/"
+          ]
+        },
+        "role": {
+          "title": "Staff AI Engineer",
+          "seniority": "Lead / Staff",
+          "responsibilities": [
+            "Collaborate with cross-functional teams to deliver high-quality solutions."
+          ],
+          "requirements": [
+            {
+              "id": "r1",
+              "text": "LLM fine-tuning, RAG pipelines, Vector search (must)",
+              "kind": "technical",
+              "priority": "must"
+            },
+            {
+              "id": "r2",
+              "text": "Distributed model training on GPU clusters (must)",
+              "kind": "technical",
+              "priority": "must"
+            },
+            {
+              "id": "r3",
+              "text": "Published research papers are a strong plus (nice)",
+              "kind": "technical",
+              "priority": "nice"
+            }
+          ]
+        },
+        "questions": [
+          {
+            "id": "q1",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "technical",
+            "prompt": "Explain the core principles and common pitfalls when working with: \"LLM fine-tuning, RAG pipelines, Vector search (must)\". How do you ensure high performance and maintainability?",
+            "answer_outline": "1. Explain core mechanisms. 2. Discuss memory/runtime complexity and failure modes. 3. Detail automated testing strategies.",
+            "difficulty": 3
+          },
+          {
+            "id": "q2",
+            "requirement_ids": [
+              "r2"
+            ],
+            "category": "technical",
+            "prompt": "Explain the core principles and common pitfalls when working with: \"Distributed model training on GPU clusters (must)\". How do you ensure high performance and maintainability?",
+            "answer_outline": "1. Explain core mechanisms. 2. Discuss memory/runtime complexity and failure modes. 3. Detail automated testing strategies.",
+            "difficulty": 3
+          },
+          {
+            "id": "q3",
+            "requirement_ids": [
+              "r3"
+            ],
+            "category": "technical",
+            "prompt": "Explain the core principles and common pitfalls when working with: \"Published research papers are a strong plus (nice)\". How do you ensure high performance and maintainability?",
+            "answer_outline": "1. Explain core mechanisms. 2. Discuss memory/runtime complexity and failure modes. 3. Detail automated testing strategies.",
+            "difficulty": 2
+          },
+          {
+            "id": "q4",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "system-design",
+            "prompt": "Design a resilient, scalable subsystem addressing requirement: \"LLM fine-tuning, RAG pipelines, Vector search (must)\". What data models and APIs would you implement?",
+            "answer_outline": "1. Identify bottlenecks & throughput. 2. Partitioning / caching patterns. 3. Fault-tolerance & monitoring.",
+            "difficulty": 3
+          },
+          {
+            "id": "q5",
+            "requirement_ids": [
+              "r2"
+            ],
+            "category": "system-design",
+            "prompt": "Design a resilient, scalable subsystem addressing requirement: \"Distributed model training on GPU clusters (must)\". What data models and APIs would you implement?",
+            "answer_outline": "1. Identify bottlenecks & throughput. 2. Partitioning / caching patterns. 3. Fault-tolerance & monitoring.",
+            "difficulty": 3
+          },
+          {
+            "id": "q6",
+            "requirement_ids": [
+              "r3"
+            ],
+            "category": "system-design",
+            "prompt": "Design a resilient, scalable subsystem addressing requirement: \"Published research papers are a strong plus (nice)\". What data models and APIs would you implement?",
+            "answer_outline": "1. Identify bottlenecks & throughput. 2. Partitioning / caching patterns. 3. Fault-tolerance & monitoring.",
+            "difficulty": 3
+          },
+          {
+            "id": "q7",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "behavioural",
+            "prompt": "Tell me about a time you demonstrated strong capability in: \"LLM fine-tuning, RAG pipelines, Vector search (must)\". What was the situation, your specific action, and the measurable outcome?",
+            "answer_outline": "Use STAR format: Situation, Task, Action, and measurable Result. Highlight communication and conflict resolution.",
+            "difficulty": 2
+          },
+          {
+            "id": "q8",
+            "requirement_ids": [
+              "r1"
+            ],
+            "category": "company-fit",
+            "prompt": "How do your past engineering experiences and approach to \"LLM fine-tuning, RAG pipelines, Vector search (must)\" align with our team's mission and culture?",
+            "answer_outline": "Connect technical values to business objectives. Emphasize adaptability, continuous learning, and cross-team empathy.",
+            "difficulty": 1
+          }
+        ],
+        "flashcards": [
+          {
+            "id": "f1",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"LLM fine-tuning, RAG pipelines, Vector search (must)\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for LLM fine-tuning, RAG pipelines, Vector search (must).",
+            "requirement_ids": [
+              "r1"
+            ]
+          },
+          {
+            "id": "f2",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"Distributed model training on GPU clusters (must)\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for Distributed model training on GPU clusters (must).",
+            "requirement_ids": [
+              "r2"
+            ]
+          },
+          {
+            "id": "f3",
+            "front": "Key Concept: What are the fundamental considerations when implementing \"Published research papers are a strong plus (nice)\"?",
+            "back": "Core architectural trade-offs, standard patterns, operational constraints, and edge-case handling for Published research papers are a strong plus (nice).",
+            "requirement_ids": [
+              "r3"
+            ]
+          }
+        ],
+        "schedule": {
+          "days_available": 60,
+          "days": [
+            {
+              "day": 1,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q1"
+              ],
+              "minutes": 55
+            },
+            {
+              "day": 2,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 55
+            },
+            {
+              "day": 3,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q4"
+              ],
+              "minutes": 55
+            },
+            {
+              "day": 4,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q5"
+              ],
+              "minutes": 55
+            },
+            {
+              "day": 5,
+              "focus": "STAR Stories, Mentorship & Behavioural Competencies",
+              "question_ids": [
+                "q7"
+              ],
+              "minutes": 45
+            },
+            {
+              "day": 6,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q6"
+              ],
+              "minutes": 55
+            },
+            {
+              "day": 7,
+              "focus": "Company Culture, Values & Final Alignment",
+              "question_ids": [
+                "q8"
+              ],
+              "minutes": 35
+            },
+            {
+              "day": 8,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q3"
+              ],
+              "minutes": 45
+            },
+            {
+              "day": 9,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q1"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 10,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 11,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q4"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 12,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q5"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 13,
+              "focus": "STAR Stories, Mentorship & Behavioural Competencies",
+              "question_ids": [
+                "q7"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 14,
+              "focus": "Company Culture, Values & Final Alignment",
+              "question_ids": [
+                "q8"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 15,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q1"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 16,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 17,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q4"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 18,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q5"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 19,
+              "focus": "STAR Stories, Mentorship & Behavioural Competencies",
+              "question_ids": [
+                "q7"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 20,
+              "focus": "Company Culture, Values & Final Alignment",
+              "question_ids": [
+                "q8"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 21,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q1"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 22,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 23,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q4"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 24,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q5"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 25,
+              "focus": "STAR Stories, Mentorship & Behavioural Competencies",
+              "question_ids": [
+                "q7"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 26,
+              "focus": "Company Culture, Values & Final Alignment",
+              "question_ids": [
+                "q8"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 27,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q1"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 28,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 29,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q4"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 30,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q5"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 31,
+              "focus": "STAR Stories, Mentorship & Behavioural Competencies",
+              "question_ids": [
+                "q7"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 32,
+              "focus": "Company Culture, Values & Final Alignment",
+              "question_ids": [
+                "q8"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 33,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q1"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 34,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 35,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q4"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 36,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q5"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 37,
+              "focus": "STAR Stories, Mentorship & Behavioural Competencies",
+              "question_ids": [
+                "q7"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 38,
+              "focus": "Company Culture, Values & Final Alignment",
+              "question_ids": [
+                "q8"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 39,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q1"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 40,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 41,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q4"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 42,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q5"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 43,
+              "focus": "STAR Stories, Mentorship & Behavioural Competencies",
+              "question_ids": [
+                "q7"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 44,
+              "focus": "Company Culture, Values & Final Alignment",
+              "question_ids": [
+                "q8"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 45,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q1"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 46,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 47,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q4"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 48,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q5"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 49,
+              "focus": "STAR Stories, Mentorship & Behavioural Competencies",
+              "question_ids": [
+                "q7"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 50,
+              "focus": "Company Culture, Values & Final Alignment",
+              "question_ids": [
+                "q8"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 51,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q1"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 52,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 53,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q4"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 54,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q5"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 55,
+              "focus": "STAR Stories, Mentorship & Behavioural Competencies",
+              "question_ids": [
+                "q7"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 56,
+              "focus": "Company Culture, Values & Final Alignment",
+              "question_ids": [
+                "q8"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 57,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q1"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 58,
+              "focus": "Technical Mastery & Code Implementation",
+              "question_ids": [
+                "q2"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 59,
+              "focus": "Core Review: system-design",
+              "question_ids": [
+                "q4"
+              ],
+              "minutes": 30
+            },
+            {
+              "day": 60,
+              "focus": "Final Polish, Key Concepts & Mock Simulation",
+              "question_ids": [
+                "q5"
               ],
               "minutes": 30
             }

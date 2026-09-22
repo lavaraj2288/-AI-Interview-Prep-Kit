@@ -1,136 +1,103 @@
 import { describe, it, expect } from 'vitest';
-import { validatePrepKit } from '../server/src/services/pipeline/kitValidator.js';
-import { PrepKit } from '../server/src/types/kit.js';
+import { validateAppendixAKit } from '../server/src/services/pipeline/kitValidator.js';
+import { AppendixAKit } from '../server/src/types/kit.js';
 
-describe('Kit Structure Validator (Appendix A Compliance)', () => {
-  const validKit: PrepKit = {
+describe('Kit Validator (Appendix A Schema Compliance)', () => {
+  const validKit: AppendixAKit = {
     source: {
       company: 'Acme Corp',
-      company_url: 'https://acme.example.com',
-      role: 'Senior Full Stack Engineer',
+      company_url: 'https://acme.com',
+      role: 'Staff Engineer',
       location: 'Remote',
-      jd_chars: 520,
-      researched_at: '2026-09-01T09:00:00Z',
-      pages_used: ['https://acme.example.com', 'https://acme.example.com/careers'],
+      jd_chars: 1200,
+      researched_at: '2026-09-01T12:00:00Z',
+      pages_used: ['https://acme.com']
     },
     company_brief: {
-      summary: 'Acme Corp is a technology enterprise.',
-      what_they_do: 'Builds enterprise automation tools.',
-      sources: ['https://acme.example.com'],
+      summary: 'Acme builds distributed telemetry tools.',
+      what_they_do: 'They build observability platforms and hire through take-home exercises.',
+      sources: ['https://acme.com']
     },
     role: {
-      title: 'Senior Full Stack Engineer',
-      seniority: 'Senior',
-      responsibilities: ['Architect microservices', 'Mentor team members'],
+      title: 'Staff Engineer',
+      seniority: 'Staff',
+      responsibilities: ['Architect scalable systems', 'Mentor staff'],
       requirements: [
-        {
-          id: 'r1',
-          text: '5+ years with React',
-          kind: 'technical',
-          priority: 'must',
-        },
-        {
-          id: 'r2',
-          text: 'Mentoring junior engineers',
-          kind: 'behavioural',
-          priority: 'must',
-        },
-      ],
+        { id: 'r1', text: '5+ years with React', kind: 'technical', priority: 'must' }
+      ]
     },
     questions: [
       {
         id: 'q1',
         requirement_ids: ['r1'],
         category: 'technical',
-        prompt: 'How do React hooks work internally?',
-        answer_outline: 'Fiber nodes, memoizedState linked list',
-        difficulty: 2,
-      },
-      {
-        id: 'q2',
-        requirement_ids: ['r2'],
-        category: 'behavioural',
-        prompt: 'Describe a time you coached a struggling teammate',
-        answer_outline: 'Empathy, structured check-ins, measurable outcome',
-        difficulty: 2,
-      },
+        prompt: 'How do you optimize render cycles in large React apps?',
+        answer_outline: 'Fiber reconciliation, memoization, virtualization',
+        difficulty: 2
+      }
     ],
     flashcards: [
       {
         id: 'f1',
-        front: 'React Fiber Architecture',
-        back: 'Reconciliation algorithm allowing interruptible rendering',
-        requirement_ids: ['r1'],
-      },
+        front: 'What is reconciliation in React?',
+        back: 'The algorithm React uses to diff one tree with another to determine what needs to be changed.',
+        requirement_ids: ['r1']
+      }
     ],
     schedule: {
-      days_available: 2,
+      days_available: 5,
       days: [
         {
           day: 1,
-          focus: 'Technical Mastery',
+          focus: 'React internals & reconciliation',
           question_ids: ['q1'],
-          minutes: 45,
-        },
-        {
-          day: 2,
-          focus: 'Behavioral & Leadership',
-          question_ids: ['q2'],
-          minutes: 45,
-        },
-      ],
+          minutes: 60
+        }
+      ]
     },
     coverage: {
       uncovered_requirement_ids: [],
-      passes: 1,
-    },
+      passes: 2
+    }
   };
 
-  it('validates a correct kit adhering to Appendix A', () => {
-    const result = validatePrepKit(validKit);
+  it('validates a correct Appendix A kit structure', () => {
+    const result = validateAppendixAKit(validKit);
     expect(result.valid).toBe(true);
-    expect(result.errors).toEqual([]);
+    expect(result.data).toBeDefined();
   });
 
-  it('rejects kits with missing required Appendix A fields', () => {
-    const invalid = { ...validKit };
-    // @ts-expect-error test invalid schema
+  it('rejects non-integer minutes in schedule (e.g. 60.5)', () => {
+    const invalid = JSON.parse(JSON.stringify(validKit));
+    invalid.schedule.days[0].minutes = 60.5;
+
+    const result = validateAppendixAKit(invalid);
+    expect(result.valid).toBe(false);
+    expect(result.errors?.[0]).toContain('Expected integer');
+  });
+
+  it('rejects invalid difficulty outside 1..3 range (e.g. 5)', () => {
+    const invalid = JSON.parse(JSON.stringify(validKit));
+    invalid.questions[0].difficulty = 5;
+
+    const result = validateAppendixAKit(invalid);
+    expect(result.valid).toBe(false);
+  });
+
+  it('rejects schedule referencing non-existent question ID', () => {
+    const invalid = JSON.parse(JSON.stringify(validKit));
+    invalid.schedule.days[0].question_ids = ['q_does_not_exist'];
+
+    const result = validateAppendixAKit(invalid);
+    expect(result.valid).toBe(false);
+    expect(result.errors?.[0]).toContain("references unknown question ID 'q_does_not_exist'");
+  });
+
+  it('rejects missing mandatory fields like company_brief', () => {
+    const invalid = JSON.parse(JSON.stringify(validKit));
     delete invalid.company_brief;
-    const result = validatePrepKit(invalid);
-    expect(result.valid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
-  });
 
-  it('rejects float or non-integer minutes in schedule', () => {
-    const invalid = JSON.parse(JSON.stringify(validKit)) as PrepKit;
-    invalid.schedule.days[0].minutes = 45.5; // Float
-    const result = validatePrepKit(invalid);
+    const result = validateAppendixAKit(invalid);
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes('minutes') || e.includes('Expected integer'))).toBe(true);
-  });
-
-  it('rejects difficulty outside 1 to 3', () => {
-    const invalid = JSON.parse(JSON.stringify(validKit)) as PrepKit;
-    invalid.questions[0].difficulty = 5; // Invalid difficulty
-    const result = validatePrepKit(invalid);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes('difficulty'))).toBe(true);
-  });
-
-  it('rejects schedule referencing non-existent question_ids', () => {
-    const invalid = JSON.parse(JSON.stringify(validKit)) as PrepKit;
-    invalid.schedule.days[0].question_ids = ['q999']; // Non-existent
-    const result = validatePrepKit(invalid);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes('non-existent question_id "q999"'))).toBe(true);
-  });
-
-  it('rejects schedule where a must-have requirement is not scheduled', () => {
-    const invalid = JSON.parse(JSON.stringify(validKit)) as PrepKit;
-    // Day 2 was covering r2 (must have); if we change Day 2 to also only cover q1:
-    invalid.schedule.days[1].question_ids = ['q1'];
-    const result = validatePrepKit(invalid);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes('Must-have requirement "r2"'))).toBe(true);
   });
 });

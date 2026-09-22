@@ -1,52 +1,32 @@
 {
   "name": "ai-interview-prep-kit",
   "version": "1.0.0",
-  "description": "AI-powered interview preparation kit generator conforming to TRAO specifications",
-  "main": "server/src/index.ts",
+  "description": "The AI Interview Prep Kit - Full-Stack Engineering Assessment FS-AI-INTERVIEW-01",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "server",
+    "client"
+  ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "tsx watch server/src/index.ts",
-    "dev:client": "npm --prefix client run dev",
-    "build:server": "tsc",
-    "build:client": "npm --prefix client run build",
-    "build": "npm run build:server && npm run build:client",
-    "start": "node dist/server/src/index.js",
+    "dev": "concurrently \"npm run dev --workspace=server\" \"npm run dev --workspace=client\"",
+    "dev:server": "npm run dev --workspace=server",
+    "dev:client": "npm run dev --workspace=client",
+    "build": "npm run build --workspace=server && npm run build --workspace=client",
     "test": "vitest run",
     "test:watch": "vitest",
-    "evaluate": "tsx scripts/evaluate.ts"
-  },
-  "keywords": [
-    "ai",
-    "interview",
-    "prep-kit",
-    "trao",
-    "assessment"
-  ],
-  "author": "",
-  "license": "MIT",
-  "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "axios": "^1.20.0",
-    "bcryptjs": "^3.0.3",
-    "cheerio": "^1.2.0",
-    "commander": "^15.0.0",
-    "concurrently": "^10.0.5",
-    "cors": "^2.8.6",
-    "dotenv": "^18.0.2",
-    "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.10.1",
-    "zod": "^4.6.5"
+    "evaluate": "tsx scripts/evaluate.ts",
+    "db:check": "tsx scripts/check-db.ts"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/cheerio": "^0.22.35",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^26.6.2",
-    "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.1"
+    "@types/node": "^22.13.9",
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.7",
+    "zod": "^3.24.2"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7"
   }
 }

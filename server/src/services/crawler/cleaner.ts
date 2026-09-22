@@ -1,44 +1,54 @@
 import * as cheerio from 'cheerio';
 
-export interface CleanedPage {
+export interface CleanedDocument {
   title: string;
   cleanText: string;
+  charCount: number;
 }
 
-export function cleanHtml(html: string, maxChars: number = 12000): CleanedPage {
+const MAX_CHAR_LIMIT = 25000;
+
+export function cleanHtmlContent(html: string): CleanedDocument {
   if (!html || typeof html !== 'string') {
-    return { title: '', cleanText: '' };
+    return { title: '', cleanText: '', charCount: 0 };
   }
 
   const $ = cheerio.load(html);
 
-  // Remove unwanted elements
-  $('script, style, noscript, iframe, svg, canvas, nav, footer, header, form, button, input, select, textarea, .ad, .cookie, .banner, .modal').remove();
-
-  // Extract page title
+  // Extract title
   const title = $('title').text().trim() || $('h1').first().text().trim() || '';
 
+  // Remove non-content elements
+  $('script, style, noscript, svg, iframe, nav, footer, header, form, button').remove();
+
   // Prefer main content container if available
-  let contentElement = $('main, article, #content, .content, .main-content, body');
-  if (contentElement.length === 0) {
-    contentElement = $('body');
+  let contentTarget = $('main, article, #content, .content, [role="main"]').first();
+  if (contentTarget.length === 0) {
+    contentTarget = $('body');
   }
 
-  // Extract text and normalize whitespace
-  let text = contentElement
-    .text()
-    .replace(/\t+/g, ' ')
-    .replace(/\r?\n\s*\r?\n/g, '\n\n')
-    .replace(/[ ]{2,}/g, ' ')
-    .trim();
+  // Replace block elements with linebreaks for readability
+  contentTarget.find('p, h1, h2, h3, h4, h5, h6, li, tr, div').each((_, el) => {
+    $(el).append('\n');
+  });
 
-  // Prevent prompt injection: ensure fetched text is clearly treated as data
-  if (text.length > maxChars) {
-    text = text.slice(0, maxChars) + '\n...[Content truncated for length]';
+  const rawText = contentTarget.text();
+
+  // Normalize excessive spaces and blank lines
+  const cleanLines = rawText
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
+
+  let cleanText = cleanLines.join('\n');
+
+  if (cleanText.length > MAX_CHAR_LIMIT) {
+    cleanText = cleanText.substring(0, MAX_CHAR_LIMIT) + '\n... [content truncated for length]';
   }
 
   return {
     title,
-    cleanText: text,
+    cleanText,
+    charCount: cleanText.length
   };
 }

@@ -1,180 +1,129 @@
-import axios, { AxiosError } from 'axios';
-import { validateAndNormalizeUrl } from './urlGuard.js';
+import { validateExternalUrl } from './urlGuard.js';
 import { RobotsParser } from './robotsParser.js';
-import { cleanHtml } from './cleaner.js';
-import { rankDiscoveredLinks } from './linkRanker.js';
-import { findPublicDiscussion } from './discussionFinder.js';
+import { cleanHtmlContent } from './cleaner.js';
+import { rankLinksFromHtml } from './linkRanker.js';
+import { CrawledPage, CrawlerResult } from '../../types/kit.js';
 
-export interface CrawledPage {
-  url: string;
-  title: string;
-  content: string;
-  category: 'homepage' | 'hiring' | 'company' | 'other';
-}
+const DEFAULT_TIMEOUT_MS = 8000;
+const MAX_PAGES_TO_FETCH = 4;
+const MAX_BYTE_SIZE = 2 * 1024 * 1024; // 2MB
 
-export interface CrawlResult {
-  isUnreachable: boolean;
-  unreachableReason?: string;
-  homepage: CrawledPage | null;
-  pages: CrawledPage[];
-  pagesUsed: string[];
-  hiringPageFound: boolean;
-  publicDiscussion: {
-    found: boolean;
-    notes: string;
-    sources: string[];
-  };
-  errors: string[];
-}
+export class CompanyCrawler {
+  private robotsParser = new RobotsParser();
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  async crawlCompanySite(targetUrl: string): Promise<CrawlerResult> {
+    const result: CrawlerResult = {
+      pages: [],
+      hiringPageFound: false,
+      publicDiscussion: [],
+      errors: []
+    };
 
-async function fetchWithRetry(
-  url: string,
-  retries: number = 3,
-  timeoutMs: number = 5000
-): Promise<{ data: string; status: number } | null> {
-  let attempt = 0;
-  let lastError: unknown = null;
+    const urlCheck = validateExternalUrl(targetUrl);
+    if (!urlCheck.valid || !urlCheck.normalizedUrl) {
+      result.errors.push({
+        url: targetUrl,
+        reason: urlCheck.reason || 'Invalid URL'
+      });
+      return result;
+    }
 
-  while (attempt < retries) {
-    attempt++;
+    const startUrl = urlCheck.normalizedUrl;
+
+    // Check robots.txt
+    await this.robotsParser.fetchAndParse(startUrl);
+
+    // Fetch homepage / entry point
+    const homepage = await this.fetchSinglePage(startUrl);
+    if (!homepage) {
+      result.errors.push({
+        url: startUrl,
+        reason: 'Root page could not be retrieved or timed out'
+      });
+      return result;
+    }
+
+    result.pages.push(homepage.page);
+
+    // Rank discovered links
+    const rankedLinks = rankLinksFromHtml(homepage.rawHtml, startUrl);
+
+    // Filter by robots.txt and take top candidates
+    const eligibleLinks = rankedLinks
+      .filter(l => this.robotsParser.isAllowed(l.url))
+      .slice(0, MAX_PAGES_TO_FETCH);
+
+    for (const link of eligibleLinks) {
+      // Respectful delay between requests
+      await new Promise(r => setTimeout(r, 200));
+
+      const subpage = await this.fetchSinglePage(link.url);
+      if (subpage) {
+        result.pages.push(subpage.page);
+        if (link.isHiringProcessCandidate || subpage.page.text.toLowerCase().includes('interview process')) {
+          result.hiringPageFound = true;
+        }
+      } else {
+        result.errors.push({
+          url: link.url,
+          reason: 'Failed to retrieve subpage or timed out'
+        });
+      }
+    }
+
+    return result;
+  }
+
+  private async fetchSinglePage(urlString: string): Promise<{ page: CrawledPage; rawHtml: string } | null> {
     try {
-      const response = await axios.get(url, {
-        timeout: timeoutMs,
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+
+      const response = await fetch(urlString, {
+        signal: controller.signal,
         headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) TraoInterviewPrepBot/1.0',
-          Accept: 'text/html,application/xhtml+xml',
-        },
-        maxRedirects: 5,
-        validateStatus: (status) => status < 500, // Handle 404 cleanly without throwing
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 (Compatible; TraoInterviewKitCrawler/1.0)',
+          'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8'
+        }
       });
 
-      if (response.status === 200 && typeof response.data === 'string') {
-        return { data: response.data, status: 200 };
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return null;
       }
 
-      if (response.status === 404) {
-        // 404 is definitive, don't retry
-        return { data: '', status: 404 };
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('text/html') && !contentType.includes('text/plain')) {
+        return null;
       }
 
-      // If 429 or other status, back off and retry
-      await sleep(500 * Math.pow(2, attempt));
-    } catch (err) {
-      lastError = err;
-      if (attempt < retries) {
-        await sleep(500 * Math.pow(2, attempt));
+      // Check content-length header if provided
+      const contentLengthHeader = response.headers.get('content-length');
+      if (contentLengthHeader && parseInt(contentLengthHeader, 10) > MAX_BYTE_SIZE) {
+        return null;
       }
-    }
-  }
 
-  return null;
-}
-
-export async function crawlCompanySite(
-  companyUrl: string,
-  companyNameHint: string = ''
-): Promise<CrawlResult> {
-  const result: CrawlResult = {
-    isUnreachable: false,
-    homepage: null,
-    pages: [],
-    pagesUsed: [],
-    hiringPageFound: false,
-    publicDiscussion: {
-      found: false,
-      notes: '',
-      sources: [],
-    },
-    errors: [],
-  };
-
-  // 1. URL validation & normalization
-  const urlCheck = validateAndNormalizeUrl(companyUrl);
-  if (!urlCheck.valid) {
-    result.isUnreachable = true;
-    result.unreachableReason = urlCheck.error || 'Invalid company URL';
-    result.errors.push(result.unreachableReason);
-    return result;
-  }
-
-  const normalizedBaseUrl = urlCheck.normalizedUrl;
-
-  // 2. Fetch Homepage (3 retries with backoff)
-  const homeFetch = await fetchWithRetry(normalizedBaseUrl, 3, 6000);
-  if (!homeFetch || homeFetch.status !== 200 || !homeFetch.data) {
-    result.isUnreachable = true;
-    result.unreachableReason = `Company site unreachable after 3 retries (status: ${homeFetch?.status || 'no response'}).`;
-    result.errors.push(result.unreachableReason);
-    return result;
-  }
-
-  // Clean Homepage
-  const cleanedHome = cleanHtml(homeFetch.data);
-  result.homepage = {
-    url: normalizedBaseUrl,
-    title: cleanedHome.title || 'Company Homepage',
-    content: cleanedHome.cleanText,
-    category: 'homepage',
-  };
-  result.pages.push(result.homepage);
-  result.pagesUsed.push(normalizedBaseUrl);
-
-  // 3. Load Robots.txt
-  const robots = await RobotsParser.load(normalizedBaseUrl);
-
-  // 4. Rank Discovered Links (find hiring / about pages dynamically)
-  const rankedLinks = rankDiscoveredLinks(homeFetch.data, normalizedBaseUrl, 6);
-
-  // 5. Fetch Top Ranked Pages (up to 3 candidate pages)
-  let fetchedCount = 0;
-  for (const candidate of rankedLinks) {
-    if (fetchedCount >= 3) break;
-
-    // Check robots permission
-    if (!robots.isAllowed(candidate.url)) {
-      result.errors.push(`Robots.txt disallowed path: ${candidate.url}`);
-      continue;
-    }
-
-    // Polite delay between requests
-    await sleep(250);
-
-    try {
-      const pageFetch = await fetchWithRetry(candidate.url, 2, 4000);
-      if (pageFetch && pageFetch.status === 200 && pageFetch.data) {
-        const cleaned = cleanHtml(pageFetch.data);
-        if (cleaned.cleanText.length > 50) {
-          result.pages.push({
-            url: candidate.url,
-            title: cleaned.title || candidate.anchorText || candidate.url,
-            content: cleaned.cleanText,
-            category: candidate.category,
-          });
-          result.pagesUsed.push(candidate.url);
-          fetchedCount++;
-
-          if (candidate.category === 'hiring') {
-            result.hiringPageFound = true;
-          }
-        }
-      } else if (pageFetch?.status === 404) {
-        result.errors.push(`Discovered link returned 404: ${candidate.url}`);
+      const rawHtml = await response.text();
+      if (rawHtml.length > MAX_BYTE_SIZE) {
+        return null;
       }
+
+      const cleaned = cleanHtmlContent(rawHtml);
+
+      return {
+        page: {
+          url: urlString,
+          title: cleaned.title || urlString,
+          text: cleaned.cleanText,
+          status: response.status,
+          contentType,
+          sizeBytes: rawHtml.length
+        },
+        rawHtml
+      };
     } catch {
-      result.errors.push(`Failed to fetch link: ${candidate.url}`);
+      return null;
     }
   }
-
-  // 6. Public discussion lookup
-  const companyName = companyNameHint || cleanedHome.title || '';
-  const discussion = await findPublicDiscussion(companyName);
-  result.publicDiscussion = discussion;
-  if (discussion.found && discussion.sources.length > 0) {
-    result.pagesUsed.push(...discussion.sources);
-  }
-
-  return result;
 }
